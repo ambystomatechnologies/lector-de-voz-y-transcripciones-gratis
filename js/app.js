@@ -1321,7 +1321,8 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
           let buffer = "";
           let currentFileText = "";
 
-          while (true) {
+          let fileFinished = false;
+          while (!fileFinished) {
             const { done, value } = await reader.read();
             if (done) break;
 
@@ -1389,12 +1390,21 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
                     const words = livePreview.trim() ? livePreview.trim().split(/\s+/).length : 0;
                     transcribeWordCount.textContent = `${words.toLocaleString()} palabras`;
                   }
+                  fileFinished = true;
+                  break;
                 } else if (event.type === "error") {
+                  fileFinished = true;
                   throw new Error(event.error || "Error durante la transcripción");
                 }
               } catch (parseErr) {
+                if (fileFinished) throw parseErr;
                 console.warn("Aviso parseando chunk de transcripción:", parseErr);
               }
+            }
+
+            if (fileFinished) {
+              try { await reader.cancel(); } catch (e) {}
+              break;
             }
           }
 

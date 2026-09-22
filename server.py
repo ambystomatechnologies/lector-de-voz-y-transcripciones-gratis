@@ -119,7 +119,7 @@ class OfflineAudioDiarizer:
 
     @classmethod
     def process_diarization(cls, audio_wav_path, segments, num_speakers=2):
-        if not segments or not has_diarization_deps:
+        if not segments or not has_diarization_deps or len(segments) <= 1:
             for seg in segments:
                 seg['speaker'] = "Hablante 1"
             return segments
@@ -544,7 +544,7 @@ class NeuralTTSHandler(SimpleHTTPRequestHandler):
             self.send_response(HTTPStatus.OK)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
             self.send_header("Cache-Control", "no-cache")
-            self.send_header("Connection", "keep-alive")
+            self.send_header("Connection", "close")
             self._set_cors_headers()
             self.end_headers()
 
@@ -568,6 +568,8 @@ class NeuralTTSHandler(SimpleHTTPRequestHandler):
                     self.wfile.flush()
                 except Exception:
                     pass
+            finally:
+                self.close_connection = True
             return
 
         if parsed.path == "/api/tts":
