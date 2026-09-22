@@ -380,46 +380,15 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
     const allSpVoices = ttsEngine.getSpanishVoices();
     voiceSelect.innerHTML = "";
 
-    // 1. Voces nativas del navegador (filtro inteligente)
-    if (allSpVoices.length > 0) {
-      let browserMatches = selectedLocale === "ALL" 
-        ? allSpVoices 
-        : allSpVoices.filter((v) => v.lang && v.lang.toLowerCase().startsWith(selectedLocale.toLowerCase()));
-
-      // Si el país específico no tiene voz en el navegador (ej. es-CR en Chrome),
-      // mostrar las voces naturales de mayor calidad disponibles en español
-      if (browserMatches.length === 0) {
-        browserMatches = allSpVoices.filter(v => !(v.name || "").toLowerCase().includes("desktop"));
-        if (browserMatches.length === 0) browserMatches = allSpVoices;
-      }
-
-      const optGroupBrowser = document.createElement("optgroup");
-      optGroupBrowser.label = "Voces del Navegador / Sistema";
-
-      browserMatches.forEach((v) => {
-        const opt = document.createElement("option");
-        opt.value = v.voiceURI;
-        const gender = getGenderFromVoiceName(v.name);
-        opt.setAttribute("data-gender", gender);
-        opt.setAttribute("data-locale", v.lang || selectedLocale);
-        const icon = gender === "Hombre" ? "👨" : "👩";
-        const isNatural = (v.name || "").toLowerCase().includes("natural") || (v.name || "").toLowerCase().includes("online") || (v.name || "").toLowerCase().includes("google");
-        const badge = isNatural ? "★ Fluida" : "Estándar";
-        opt.textContent = `${icon} ${v.name} (${badge})`;
-        optGroupBrowser.appendChild(opt);
-      });
-      voiceSelect.appendChild(optGroupBrowser);
-    }
-
-    // 2. Catálogo completo de voces neuronales (disponibles en servidor local o mapeables en navegador)
+    // 1. CATÁLOGO DE VOCES NEURALES (edge-tts / servidor Python)
+    // Estas son las voces de alta calidad disponibles via servidor local o mapeo por nombre.
     const catalogVoices = selectedLocale === "ALL" 
       ? ORIGINAL_APP_VOICES 
       : ORIGINAL_APP_VOICES.filter((v) => v.locale === selectedLocale);
 
     if (catalogVoices.length > 0) {
       const optGroupCatalog = document.createElement("optgroup");
-      optGroupCatalog.label = "Catálogo de Voces Neurales";
-
+      optGroupCatalog.label = "⭐ Voces Neurales (Servidor Local / edge-tts)";
       catalogVoices.forEach((cv) => {
         const opt = document.createElement("option");
         opt.value = cv.shortName;
@@ -432,13 +401,47 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
       voiceSelect.appendChild(optGroupCatalog);
     }
 
-    // 3. Fallback si no hubiese opciones
+    // 2. VOCES NATIVAS DEL NAVEGADOR (Web Speech API del sistema)
+    if (allSpVoices.length > 0) {
+      // Filtrar por locale seleccionado, o mostrar todas si no hay coincidencia
+      let browserMatches = selectedLocale === "ALL" 
+        ? allSpVoices 
+        : allSpVoices.filter((v) => v.lang && v.lang.toLowerCase().startsWith(selectedLocale.toLowerCase()));
+
+      // Si el país específico no tiene voz en el navegador, mostrar todas las no-Desktop disponibles
+      if (browserMatches.length === 0) {
+        browserMatches = allSpVoices.filter(v => !(v.name || "").toLowerCase().includes("desktop"));
+        if (browserMatches.length === 0) browserMatches = allSpVoices.slice(0, 5);
+      }
+
+      if (browserMatches.length > 0) {
+        const optGroupBrowser = document.createElement("optgroup");
+        optGroupBrowser.label = "🌐 Voces del Navegador / Sistema";
+        browserMatches.forEach((v) => {
+          const opt = document.createElement("option");
+          opt.value = v.voiceURI;
+          const gender = getGenderFromVoiceName(v.name);
+          opt.setAttribute("data-gender", gender);
+          opt.setAttribute("data-locale", v.lang || selectedLocale);
+          const icon = gender === "Hombre" ? "👨" : "👩";
+          const isNatural = (v.name || "").toLowerCase().includes("natural") || 
+                           (v.name || "").toLowerCase().includes("online") || 
+                           (v.name || "").toLowerCase().includes("google");
+          const badge = isNatural ? "★ Fluida" : "Estándar";
+          opt.textContent = `${icon} ${v.name} (${badge})`;
+          optGroupBrowser.appendChild(opt);
+        });
+        voiceSelect.appendChild(optGroupBrowser);
+      }
+    }
+
+    // 3. Fallback si no hay opciones
     if (voiceSelect.options.length === 0) {
       const opt = document.createElement("option");
-      opt.value = "default-spanish";
+      opt.value = "es-CR-JuanNeural";
       opt.setAttribute("data-gender", "Hombre");
-      opt.setAttribute("data-locale", selectedLocale);
-      opt.textContent = "👨 Voz en Español (Predeterminada)";
+      opt.setAttribute("data-locale", "es-CR");
+      opt.textContent = "👨 es-CR-JuanNeural · Hombre · es-CR";
       voiceSelect.appendChild(opt);
     }
 

@@ -272,7 +272,13 @@ class TTSEngine {
     this._startKeepAlive();
     this._notifyState();
 
-    this._speakCurrentSentence();
+    // Delay breve necesario en Chrome: synth.cancel() es asíncrono y si
+    // se llama synth.speak() inmediatamente, el utterance se ignora silenciosamente.
+    setTimeout(() => {
+      if (this.isPlaying && !this.isPaused) {
+        this._speakCurrentSentence();
+      }
+    }, 150);
   }
 
   /**
