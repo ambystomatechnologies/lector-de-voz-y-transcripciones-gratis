@@ -339,10 +339,8 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
   ];
 
   function populateVoiceList(spanishVoices) {
-    voiceSelect.innerHTML = "";
+    // Siempre reconstruir la lista completa de locales
     localeFilter.innerHTML = `<option value="ALL">Todos los acentos</option>`;
-
-    // Poblamos SIEMPRE los 22 acentos de la app original
     ALL_SPANISH_LOCALES.forEach((loc) => {
       const opt = document.createElement("option");
       opt.value = loc.code;
@@ -350,11 +348,26 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
       localeFilter.appendChild(opt);
     });
 
-    // Por defecto seleccionar Costa Rica como en la app original
+    // Por defecto seleccionar Costa Rica
     localeFilter.value = "es-CR";
 
     renderFilteredVoices();
   }
+
+  // ── Inicialización inmediata del selector de voces ─────────────────────────
+  // Cargar el catálogo neural desde el inicio sin esperar las voces del navegador.
+  // Esto garantiza que siempre haya voces disponibles cuando el servidor local está activo.
+  (function initVoiceDropdownEarly() {
+    localeFilter.innerHTML = `<option value="ALL">Todos los acentos</option>`;
+    ALL_SPANISH_LOCALES.forEach((loc) => {
+      const opt = document.createElement("option");
+      opt.value = loc.code;
+      opt.textContent = loc.name;
+      localeFilter.appendChild(opt);
+    });
+    localeFilter.value = "es-CR";
+    renderFilteredVoices();   // Agrega catálogo neural inmediatamente
+  })();
 
   function getGenderFromVoiceName(name) {
     const maleKeywords = [
