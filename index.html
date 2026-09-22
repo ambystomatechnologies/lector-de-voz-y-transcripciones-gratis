@@ -45,7 +45,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
   <!-- Estilos CSS Dark Mode -->
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=1.2">
 
   <!-- Librerías Externas para Lectura Cliente de Formatos (Sin Servidor) -->
   <!-- SheetJS: Importar y Exportar Diccionarios Excel (.xlsx) -->
@@ -76,10 +76,10 @@
         </div>
       </a>
 
-      <!-- Logo Central de Ambystoma Technologies en el espacio disponible -->
-      <div class="header-logo-container" title="Ambystoma Technologies">
+      <!-- Logo Central de Ambystoma Technologies en el espacio disponible con enlace oficial -->
+      <a href="https://ambystomatechnologies.github.io/" target="_blank" rel="noopener noreferrer" class="header-logo-container" title="Ambystoma Technologies - Ir al sitio principal">
         <img src="logo.png" alt="Ambystoma Technologies - Science and Technology Applications" class="header-brand-logo">
-      </div>
+      </a>
 
       <!-- Conmutador de Modos: Texto a Voz / Transcribir Audio -->
       <nav class="mode-nav">
@@ -583,7 +583,7 @@
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+            <div class="transcribe-options-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
               <div class="form-group" style="margin-bottom: 0;">
                 <label class="form-label" for="transcribeLangSelect">Idioma del Audio:</label>
                 <select id="transcribeLangSelect" class="select-control">
@@ -645,7 +645,7 @@
             <textarea id="transcriptionOutput" class="transcription-textarea" placeholder="Aquí aparecerá el texto transcrito de tu audio o dictado...&#10;&#10;Ejemplo con formato:&#10;[00:03] Hablante 1: Buenos días, comenzamos la sesión.&#10;[00:07] Hablante 2: Perfecto, revisemos los puntos acordados."></textarea>
 
             <!-- Acciones y Exportación -->
-            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.85rem;">
+            <div class="transcribe-actions-row" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.85rem;">
               <button id="btnExportTxt" class="btn btn-primary btn-sm" title="Guardar transcripción como archivo .txt">
                 <span>💾</span> <span>Guardar en .TXT</span>
               </button>
