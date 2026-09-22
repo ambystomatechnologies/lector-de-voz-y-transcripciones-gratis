@@ -338,36 +338,9 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
     { shortName: "es-VE-SebastianNeural", name: "Microsoft Sebastian Online (Natural) - Spanish (Venezuela)", gender: "Hombre", locale: "es-VE" }
   ];
 
-  function populateVoiceList(spanishVoices) {
-    // Siempre reconstruir la lista completa de locales
-    localeFilter.innerHTML = `<option value="ALL">Todos los acentos</option>`;
-    ALL_SPANISH_LOCALES.forEach((loc) => {
-      const opt = document.createElement("option");
-      opt.value = loc.code;
-      opt.textContent = loc.name;
-      localeFilter.appendChild(opt);
-    });
-
-    // Por defecto seleccionar Costa Rica
-    localeFilter.value = "es-CR";
-
-    renderFilteredVoices();
-  }
-
-  // ── Inicialización inmediata del selector de voces ─────────────────────────
-  // Cargar el catálogo neural desde el inicio sin esperar las voces del navegador.
-  // Esto garantiza que siempre haya voces disponibles cuando el servidor local está activo.
-  (function initVoiceDropdownEarly() {
-    localeFilter.innerHTML = `<option value="ALL">Todos los acentos</option>`;
-    ALL_SPANISH_LOCALES.forEach((loc) => {
-      const opt = document.createElement("option");
-      opt.value = loc.code;
-      opt.textContent = loc.name;
-      localeFilter.appendChild(opt);
-    });
-    localeFilter.value = "es-CR";
-    renderFilteredVoices();   // Agrega catálogo neural inmediatamente
-  })();
+  const voiceModeBadge = document.getElementById("voiceModeBadge");
+  const voiceModeDot = document.getElementById("voiceModeDot");
+  const voiceModeText = document.getElementById("voiceModeText");
 
   function getGenderFromVoiceName(name) {
     const maleKeywords = [
@@ -388,48 +361,133 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
     return "Mujer";
   }
 
+  function updateVoiceUI() {
+    const hasNeuralServer = ttsEngine.useNeuralServer;
+    const allSpVoices = ttsEngine.getSpanishVoices();
+    const prevLocale = localeFilter.value;
+
+    // 1. Indicador visual del modo activo (Servidor Local vs Modo Web)
+    if (voiceModeBadge && voiceModeDot && voiceModeText) {
+      if (hasNeuralServer) {
+        voiceModeBadge.style.background = "rgba(34, 197, 94, 0.1)";
+        voiceModeBadge.style.borderColor = "rgba(34, 197, 94, 0.3)";
+        voiceModeBadge.style.color = "#4ade80";
+        voiceModeDot.style.background = "#22c55e";
+        voiceModeText.innerHTML = `<strong>Servidor Local Activo</strong> · 45 Voces Neurales de Alta Calidad`;
+      } else {
+        voiceModeBadge.style.background = "rgba(56, 189, 248, 0.08)";
+        voiceModeBadge.style.borderColor = "rgba(56, 189, 248, 0.2)";
+        voiceModeBadge.style.color = "#94a3b8";
+        voiceModeDot.style.background = "#38bdf8";
+        voiceModeText.innerHTML = `<strong>Modo Web</strong> · Usando voces disponibles en tu navegador`;
+      }
+    }
+
+    // 2. Poblar el filtro de países / acentos (localeFilter)
+    localeFilter.innerHTML = `<option value="ALL">Todos los acentos</option>`;
+
+    if (hasNeuralServer) {
+      // Servidor local activo: mostrar catálogo completo de los 22 acentos
+      ALL_SPANISH_LOCALES.forEach((loc) => {
+        const opt = document.createElement("option");
+        opt.value = loc.code;
+        opt.textContent = loc.name;
+        localeFilter.appendChild(opt);
+      });
+      if (prevLocale && (prevLocale === "ALL" || ALL_SPANISH_LOCALES.some(l => l.code === prevLocale))) {
+        localeFilter.value = prevLocale;
+      } else {
+        localeFilter.value = "es-CR";
+      }
+    } else {
+      // Modo Web sin servidor: mostrar ÚNICAMENTE los países que realmente tienen voces instaladas en el navegador
+      const detectedLocales = new Set();
+      allSpVoices.forEach((v) => {
+        const lang = (v.lang || "").toLowerCase();
+        const match = ALL_SPANISH_LOCALES.find(l => lang.startsWith(l.code.toLowerCase()));
+        if (match) {
+          detectedLocales.add(match.code);
+        } else if (lang.startsWith("es-")) {
+          detectedLocales.add(lang.substring(0, 5));
+        } else if (lang.startsWith("es")) {
+          detectedLocales.add("es-ES");
+        }
+      });
+
+      if (detectedLocales.size > 0) {
+        ALL_SPANISH_LOCALES.forEach((loc) => {
+          if (detectedLocales.has(loc.code)) {
+            const opt = document.createElement("option");
+            opt.value = loc.code;
+            opt.textContent = loc.name;
+            localeFilter.appendChild(opt);
+          }
+        });
+      }
+
+      if (prevLocale && (prevLocale === "ALL" || detectedLocales.has(prevLocale))) {
+        localeFilter.value = prevLocale;
+      } else if (detectedLocales.size > 0) {
+        localeFilter.value = Array.from(detectedLocales)[0];
+      } else {
+        localeFilter.value = "ALL";
+      }
+    }
+
+    renderFilteredVoices();
+  }
+
   function renderFilteredVoices() {
     const selectedLocale = localeFilter.value;
     const allSpVoices = ttsEngine.getSpanishVoices();
+    const hasNeuralServer = ttsEngine.useNeuralServer;
+    const prevVoiceValue = voiceSelect.value;
     voiceSelect.innerHTML = "";
 
     // 1. CATÁLOGO DE VOCES NEURALES (edge-tts / servidor Python)
-    // Estas son las voces de alta calidad disponibles via servidor local o mapeo por nombre.
-    const catalogVoices = selectedLocale === "ALL" 
-      ? ORIGINAL_APP_VOICES 
-      : ORIGINAL_APP_VOICES.filter((v) => v.locale === selectedLocale);
+    // Se muestra ÚNICAMENTE si el servidor local de edge-tts está corriendo.
+    // En la página web publicada NO aparecerán porque no hay servidor Python.
+    if (hasNeuralServer) {
+      const catalogVoices = selectedLocale === "ALL" 
+        ? ORIGINAL_APP_VOICES 
+        : ORIGINAL_APP_VOICES.filter((v) => v.locale === selectedLocale);
 
-    if (catalogVoices.length > 0) {
-      const optGroupCatalog = document.createElement("optgroup");
-      optGroupCatalog.label = "⭐ Voces Neurales (Servidor Local / edge-tts)";
-      catalogVoices.forEach((cv) => {
-        const opt = document.createElement("option");
-        opt.value = cv.shortName;
-        opt.setAttribute("data-gender", cv.gender);
-        opt.setAttribute("data-locale", cv.locale);
-        const icon = cv.gender === "Hombre" ? "👨" : "👩";
-        opt.textContent = `${icon} ${cv.shortName} · ${cv.gender} · ${cv.locale}`;
-        optGroupCatalog.appendChild(opt);
-      });
-      voiceSelect.appendChild(optGroupCatalog);
+      if (catalogVoices.length > 0) {
+        const optGroupCatalog = document.createElement("optgroup");
+        optGroupCatalog.label = "⭐ Voces Neurales (Servidor Local / edge-tts)";
+        catalogVoices.forEach((cv) => {
+          const opt = document.createElement("option");
+          opt.value = cv.shortName;
+          opt.setAttribute("data-gender", cv.gender);
+          opt.setAttribute("data-locale", cv.locale);
+          const icon = cv.gender === "Hombre" ? "👨" : "👩";
+          opt.textContent = `${icon} ${cv.shortName} · ${cv.gender} · ${cv.locale}`;
+          optGroupCatalog.appendChild(opt);
+        });
+        voiceSelect.appendChild(optGroupCatalog);
+      }
     }
 
     // 2. VOCES NATIVAS DEL NAVEGADOR (Web Speech API del sistema)
+    // En la web son las voces principales; en local son alternativas secundarias.
     if (allSpVoices.length > 0) {
-      // Filtrar por locale seleccionado, o mostrar todas si no hay coincidencia
-      let browserMatches = selectedLocale === "ALL" 
-        ? allSpVoices 
-        : allSpVoices.filter((v) => v.lang && v.lang.toLowerCase().startsWith(selectedLocale.toLowerCase()));
-
-      // Si el país específico no tiene voz en el navegador, mostrar todas las no-Desktop disponibles
-      if (browserMatches.length === 0) {
-        browserMatches = allSpVoices.filter(v => !(v.name || "").toLowerCase().includes("desktop"));
-        if (browserMatches.length === 0) browserMatches = allSpVoices.slice(0, 5);
+      let browserMatches = allSpVoices;
+      if (selectedLocale !== "ALL") {
+        const target = selectedLocale.toLowerCase();
+        browserMatches = allSpVoices.filter((v) => (v.lang || "").toLowerCase().startsWith(target));
+        // Si no hay del país específico en modo web, mostrar las voces no-desktop generales
+        if (browserMatches.length === 0 && !hasNeuralServer) {
+          browserMatches = allSpVoices.filter(v => !(v.name || "").toLowerCase().includes("desktop"));
+          if (browserMatches.length === 0) browserMatches = allSpVoices;
+        }
       }
 
       if (browserMatches.length > 0) {
         const optGroupBrowser = document.createElement("optgroup");
-        optGroupBrowser.label = "🌐 Voces del Navegador / Sistema";
+        optGroupBrowser.label = hasNeuralServer 
+          ? "🌐 Voces del Navegador / Sistema" 
+          : "🌐 Voces Disponibles en tu Navegador";
+        
         browserMatches.forEach((v) => {
           const opt = document.createElement("option");
           opt.value = v.voiceURI;
@@ -448,17 +506,36 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
       }
     }
 
-    // 3. Fallback si no hay opciones
+    // 3. Fallback si no hay ninguna voz disponible aún
     if (voiceSelect.options.length === 0) {
       const opt = document.createElement("option");
-      opt.value = "es-CR-JuanNeural";
-      opt.setAttribute("data-gender", "Hombre");
-      opt.setAttribute("data-locale", "es-CR");
-      opt.textContent = "👨 es-CR-JuanNeural · Hombre · es-CR";
+      if (hasNeuralServer) {
+        opt.value = "es-CR-JuanNeural";
+        opt.setAttribute("data-gender", "Hombre");
+        opt.setAttribute("data-locale", "es-CR");
+        opt.textContent = "👨 es-CR-JuanNeural · Hombre · es-CR";
+      } else {
+        opt.value = "";
+        opt.textContent = "Cargando voces del navegador...";
+      }
       voiceSelect.appendChild(opt);
     }
 
-    // Sincronizar inmediatamente los parámetros con el motor
+    // Restaurar selección previa si existe
+    let restored = false;
+    if (prevVoiceValue) {
+      for (let i = 0; i < voiceSelect.options.length; i++) {
+        if (voiceSelect.options[i].value === prevVoiceValue) {
+          voiceSelect.selectedIndex = i;
+          restored = true;
+          break;
+        }
+      }
+    }
+    if (!restored && voiceSelect.options.length > 0) {
+      voiceSelect.selectedIndex = 0;
+    }
+
     applyVoiceSettings(false);
   }
 
@@ -468,7 +545,7 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
     const gender = selectedOption ? (selectedOption.getAttribute("data-gender") || "Hombre") : "Hombre";
     const loc = (selectedOption ? selectedOption.getAttribute("data-locale") : null) || localeFilter.value;
     const voiceVal = voiceSelect.value;
-    const localeVal = loc !== "ALL" ? loc : "es-ES";
+    const localeVal = loc && loc !== "ALL" ? loc : "es-CR";
 
     ttsEngine.setVoice(voiceVal, localeVal, gender);
     ttsEngine.rate = parseFloat(rateSlider.value) || 1.0;
@@ -480,7 +557,10 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
     }
   }
 
-  ttsEngine.onVoicesLoaded = (voices) => populateVoiceList(voices);
+  // Vincular eventos del motor TTS a la interfaz
+  ttsEngine.onVoicesLoaded = () => updateVoiceUI();
+  ttsEngine.onServerStatusKnown = () => updateVoiceUI();
+
   localeFilter.addEventListener("change", () => {
     renderFilteredVoices();
     applyVoiceSettings(true);
@@ -488,6 +568,9 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
   voiceSelect.addEventListener("change", () => {
     applyVoiceSettings(true);
   });
+
+  // Inicializar UI de voces de inmediato
+  updateVoiceUI();
 
   // Sliders de Ajustes con respuesta auditiva inmediata
   rateSlider.addEventListener("input", (e) => {

@@ -414,6 +414,34 @@ def apply_pronunciation_rules(text: str, rules: list[list[str]]) -> str:
     return text
 
 
+VALID_EDGE_TTS_VOICES = {
+    "es-CR-JuanNeural", "es-CR-MariaNeural", "es-ES-AlvaroNeural", "es-ES-ElviraNeural",
+    "es-MX-DaliaNeural", "es-MX-JorgeNeural", "es-AR-ElenaNeural", "es-AR-TomasNeural",
+    "es-CO-GonzaloNeural", "es-CO-SalomeNeural", "es-CL-CatalinaNeural", "es-CL-LorenzoNeural",
+    "es-BO-MarceloNeural", "es-BO-SofiaNeural", "es-CU-BelkysNeural", "es-CU-ManuelNeural",
+    "es-DO-EmilioNeural", "es-DO-RamonaNeural", "es-EC-AndreaNeural", "es-EC-LuisNeural",
+    "es-SV-LorenaNeural", "es-SV-RodrigoNeural", "es-GQ-JavierNeural", "es-GQ-TeresaNeural",
+    "es-GT-AndresNeural", "es-GT-MartaNeural", "es-HN-CarlosNeural", "es-HN-KarlaNeural",
+    "es-NI-FedericoNeural", "es-NI-YolandaNeural", "es-PA-MargaritaNeural", "es-PA-RobertoNeural",
+    "es-PY-MarioNeural", "es-PY-TaniaNeural", "es-PE-AlexNeural", "es-PE-CamilaNeural",
+    "es-PR-KarinaNeural", "es-PR-VictorNeural", "es-US-AlonsoNeural", "es-US-PalomaNeural",
+    "es-UY-MateoNeural", "es-UY-ValentinaNeural", "es-VE-PaolaNeural", "es-VE-SebastianNeural"
+}
+
+
+def resolve_edge_tts_voice(voice: str) -> str:
+    """Valida y resuelve el nombre exacto de la voz para edge-tts con fallback seguro."""
+    if not voice:
+        return "es-CR-JuanNeural"
+    if voice in VALID_EDGE_TTS_VOICES:
+        return voice
+    lower = voice.lower()
+    for valid_voice in VALID_EDGE_TTS_VOICES:
+        if valid_voice.lower() in lower or lower in valid_voice.lower():
+            return valid_voice
+    return "es-CR-JuanNeural"
+
+
 async def synthesize_edge_tts(text: str, voice: str, rate: float = 1.0, pitch: float = 1.0, volume: float = 1.0) -> bytes:
     """Sintetiza texto a audio MP3 utilizando edge-tts con parámetros de voz exactos."""
     if edge_tts is None:
@@ -433,9 +461,10 @@ async def synthesize_edge_tts(text: str, voice: str, rate: float = 1.0, pitch: f
     if not clean_text:
         return b""
     
+    resolved_voice = resolve_edge_tts_voice(voice)
     communicate = edge_tts.Communicate(
         text=clean_text,
-        voice=voice or "es-CR-JuanNeural",
+        voice=resolved_voice,
         rate=rate_str,
         volume=volume_str,
         pitch=pitch_str

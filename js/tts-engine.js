@@ -42,25 +42,77 @@ class TTSEngine {
     this.onFinish = null;
     this.onStateChange = null;
     this.onVoicesLoaded = null;
+    this.onServerStatusKnown = null;
 
     this.checkServerStatus();
     this.initVoices();
   }
 
   /**
+   * Comprueba si una voz corresponde al catálogo neural de edge-tts.
+   */
+  isNeuralVoice(voiceName) {
+    if (!voiceName) return false;
+    return voiceName.includes("Neural");
+  }
+
+  /**
    * Comprueba si el servidor local de edge-tts está disponible.
+   * En GitHub Pages / Web desactiva inmediatamente las voces neurales locales.
+   * En localhost reintenta para asegurar la conexión con Python.
    */
   async checkServerStatus() {
-    try {
-      const res = await fetch("/api/status");
-      const data = await res.json();
-      if (data && data.status === "ok" && data.has_edge_tts) {
-        this.useNeuralServer = true;
-        console.log("✓ Servidor neural edge-tts activo. Se usarán voces naturales de alta fidelidad.");
-      }
-    } catch (e) {
+    const isLocalHost = window.location.hostname === "localhost" || 
+                        window.location.hostname === "127.0.0.1" || 
+                        window.location.hostname === "";
+    
+    // Si no estamos en localhost, estamos en la web pública (GitHub Pages)
+    // No hay servidor Python en la nube, desactivar inmediatamente para no mostrar voces falsas
+    if (!isLocalHost) {
       this.useNeuralServer = false;
+      console.log("ℹ Entorno Web público detectado. Se mostrarán únicamente las voces del navegador.");
+      if (this.onServerStatusKnown) this.onServerStatusKnown(false);
+      return;
+    }
+
+    const checkOnce = async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1800);
+        const res = await fetch("/api/status", { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.status === "ok" && data.has_edge_tts) {
+            return true;
+          }
+        }
+      } catch (e) {
+        // Ignorar fallo de red puntual durante inicio del servidor
+      }
+      return false;
+    };
+
+    let isUp = await checkOnce();
+    // Si falló en localhost (ej. Python estaba terminando de cargar al abrirse el navegador), reintentar
+    if (!isUp) {
+      await new Promise(r => setTimeout(r, 600));
+      isUp = await checkOnce();
+      if (!isUp) {
+        await new Promise(r => setTimeout(r, 1200));
+        isUp = await checkOnce();
+      }
+    }
+
+    this.useNeuralServer = isUp;
+    if (isUp) {
+      console.log("✓ Servidor neural edge-tts activo. Se usarán voces naturales de alta fidelidad.");
+    } else {
       console.log("ℹ Servidor Python local no detectado, usando Web Speech API del navegador.");
+    }
+
+    if (this.onServerStatusKnown) {
+      this.onServerStatusKnown(this.useNeuralServer);
     }
   }
 
@@ -266,6 +318,11 @@ class TTSEngine {
       this.synth.cancel();
     }
 
+    // Desbloquear / preparar el elemento de audio HTML5 en el gesto de usuario
+    if (this.audioElement) {
+      this.audioElement.load();
+    }
+
     this.currentIndex = Math.max(0, Math.min(startIndex, this.sentences.length - 1));
     this.isPlaying = true;
     this.isPaused = false;
@@ -405,13 +462,17 @@ class TTSEngine {
     // Reemplazar guiones por espacios (ej. "audio-textos" -> "audio textos") para evitar deletreo
     phoneticSentence = phoneticSentence.replace(/[-—–_]/g, " ");
 
-    if (this.useNeuralServer) {
+    if (this.useNeuralServer && this.isNeuralVoice(this.selectedVoiceName)) {
       // Asegurarse de que el sintetizador del navegador esté 100% cancelado y mudo
       if (this.synth) {
         this.synth.cancel();
       }
       this._speakWithNeuralServer(rawSentence, phoneticSentence);
     } else {
+      if (this.audioElement) {
+        this.audioElement.pause();
+        this.audioElement.src = "";
+      }
       this._speakWithBrowserSynth(rawSentence, phoneticSentence);
     }
   }
