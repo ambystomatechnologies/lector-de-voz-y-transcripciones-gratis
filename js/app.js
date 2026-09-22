@@ -1103,6 +1103,7 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
   };
 
   // Carga de Múltiples Archivos de Audio (Drag & Drop + Input)
+  audioFileInput.addEventListener("click", (e) => e.stopPropagation());
   audioDropzone.addEventListener("click", () => audioFileInput.click());
 
   audioDropzone.addEventListener("dragover", (e) => {
@@ -1137,12 +1138,16 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
   }
 
   function handleAudioFiles(files) {
-    const validFiles = files.filter(f => 
-      f.type.startsWith("audio/") || f.name.match(/\.(mp3|wav|m4a|ogg|flac|webm|aac)$/i)
-    );
+    if (!files || files.length === 0) return;
+
+    const validFiles = Array.from(files).filter(f => {
+      const name = (f.name || "").toLowerCase();
+      const type = (f.type || "").toLowerCase();
+      return type.startsWith("audio/") || name.match(/\.(mp3|wav|m4a|ogg|flac|webm|aac|wma|opus|oga|m4p)$/i);
+    });
 
     if (validFiles.length === 0) {
-      showToast("Por favor selecciona archivos de audio válidos (.mp3, .wav, .m4a, .ogg, .flac).", "error");
+      showToast("Por favor selecciona archivos de audio válidos (.mp3, .wav, .m4a, .ogg, .flac, etc.).", "error");
       return;
     }
 
@@ -1159,6 +1164,8 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
 
     if (addedCount > 0) {
       showToast(`${addedCount} ${addedCount === 1 ? 'audio añadido' : 'audios añadidos'}. Total en cola: ${uploadedAudioFiles.length}.`, "info");
+    } else {
+      showToast("Los archivos seleccionados ya están en la lista.", "info");
     }
   }
 
@@ -1170,16 +1177,17 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
     if (total === 0) {
       audioFilesListContainer.style.display = "none";
       if (audioPlayerWrapper) audioPlayerWrapper.style.display = "none";
-      if (fileTranscribeActionWrapper) fileTranscribeActionWrapper.style.display = "none";
+      if (btnTranscribeFile) {
+        btnTranscribeFile.disabled = true;
+        if (btnTranscribeFileText) btnTranscribeFileText.textContent = "Proceder a Transcribir Archivos";
+      }
       return;
     }
 
     audioFilesListContainer.style.display = "block";
-    if (fileTranscribeActionWrapper) {
-      fileTranscribeActionWrapper.style.display = "block";
-      if (btnTranscribeFile) btnTranscribeFile.disabled = false;
-      if (fileTranscribeLoadingBox) fileTranscribeLoadingBox.style.display = "none";
-    }
+    if (fileTranscribeActionWrapper) fileTranscribeActionWrapper.style.display = "block";
+    if (btnTranscribeFile) btnTranscribeFile.disabled = false;
+    if (fileTranscribeLoadingBox) fileTranscribeLoadingBox.style.display = "none";
 
     if (audioFilesCountBadge) {
       const totalBytes = uploadedAudioFiles.reduce((acc, f) => acc + f.size, 0);
@@ -1276,9 +1284,6 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
       // Procesar archivo por archivo en cola secuencial para no saturar memoria RAM
       for (let i = 0; i < totalFiles; i++) {
         const file = uploadedAudioFiles[i];
-        const fileHeaderTitle = totalFiles > 1 
-          ? `════════════════════════════════════════\n📄 Transcripción: ${file.name}\n════════════════════════════════════════\n\n`
-          : "";
 
         if (fileTranscribeLoadingText) {
           fileTranscribeLoadingText.textContent = totalFiles > 1 
@@ -1352,12 +1357,12 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
                     fileTranscribeTimeDisplay.textContent = `Tiempo: ${event.current_time} / ${event.total_time}`;
                   }
 
-                  // Mostrar texto acumulado de los archivos completados + el archivo en curso
-                  let livePreview = "";
-                  if (accumulatedTranscripts.length > 0) {
-                    livePreview = accumulatedTranscripts.join("\n\n\n") + "\n\n\n";
+                  // Mostrar texto acumulado de los archivos completados + el archivo en curso (sin nombres de archivo)
+                  const completedText = accumulatedTranscripts.join("\n\n");
+                  let livePreview = completedText;
+                  if (currentFileText.trim()) {
+                    livePreview = completedText ? (completedText + "\n\n" + currentFileText.trim()) : currentFileText.trim();
                   }
-                  livePreview += fileHeaderTitle + currentFileText;
 
                   if (transcriptionOutput) {
                     transcriptionOutput.value = livePreview;
@@ -1369,6 +1374,21 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
                   }
                 } else if (event.type === "done") {
                   currentFileText = event.full_text || currentFileText;
+
+                  // Actualizar también al llegar evento "done"
+                  const completedText = accumulatedTranscripts.join("\n\n");
+                  let livePreview = completedText;
+                  if (currentFileText.trim()) {
+                    livePreview = completedText ? (completedText + "\n\n" + currentFileText.trim()) : currentFileText.trim();
+                  }
+                  if (transcriptionOutput) {
+                    transcriptionOutput.value = livePreview;
+                    transcriptionOutput.scrollTop = transcriptionOutput.scrollHeight;
+                  }
+                  if (transcribeWordCount) {
+                    const words = livePreview.trim() ? livePreview.trim().split(/\s+/).length : 0;
+                    transcribeWordCount.textContent = `${words.toLocaleString()} palabras`;
+                  }
                 } else if (event.type === "error") {
                   throw new Error(event.error || "Error durante la transcripción");
                 }
@@ -1378,9 +1398,10 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
             }
           }
 
-          // Guardar el bloque completado de este archivo
-          const finalFileBlock = fileHeaderTitle + (currentFileText.trim() || "[Sin audio o voz detectable en este archivo]");
-          accumulatedTranscripts.push(finalFileBlock);
+          // Guardar el texto transcrito de este archivo si se detectó contenido
+          if (currentFileText.trim()) {
+            accumulatedTranscripts.push(currentFileText.trim());
+          }
 
           // Actualizar barra al terminar este archivo
           const completedPct = Math.round(((i + 1) / totalFiles) * 100);
@@ -1389,14 +1410,12 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
 
         } catch (err) {
           console.warn(`Error transcribiendo ${file.name}:`, err);
-          const errBlock = fileHeaderTitle + `[Error al procesar este archivo: ${err.message}]`;
-          accumulatedTranscripts.push(errBlock);
-          showToast(`Error en "${file.name}": ${err.message}`, "error");
+          showToast(`Aviso en "${file.name}": ${err.message}`, "error");
         }
       }
 
-      // Consolidar todos los textos en el área de salida
-      const fullCombinedText = accumulatedTranscripts.join("\n\n\n");
+      // Consolidar todos los textos en el área de salida (únicamente el texto transcrito)
+      const fullCombinedText = accumulatedTranscripts.join("\n\n");
       if (transcriptionOutput) {
         transcriptionOutput.value = fullCombinedText;
         transcriptionOutput.scrollTop = transcriptionOutput.scrollHeight;
@@ -1408,7 +1427,7 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
 
       if (fileTranscribeRealProgressBar) fileTranscribeRealProgressBar.style.width = "100%";
       if (fileTranscribeProgressPct) fileTranscribeProgressPct.textContent = "100%";
-      if (fileTranscribeLoadingText) fileTranscribeLoadingText.textContent = `¡Transcripción de ${totalFiles} ${totalFiles === 1 ? 'archivo' : 'archivos'} completada con éxito!`;
+      if (fileTranscribeLoadingText) fileTranscribeLoadingText.textContent = `¡Transcripción completada con éxito!`;
 
       showToast(`¡Transcripción completada de ${totalFiles} ${totalFiles === 1 ? 'archivo' : 'archivos'}!`, "success", 5000);
 

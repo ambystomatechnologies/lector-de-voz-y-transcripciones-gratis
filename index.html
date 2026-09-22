@@ -464,15 +464,17 @@
               </div>
             </div>
 
+            <!-- Input de selección de archivos oculto fuera del dropzone para evitar propagación de clics -->
+            <input type="file" id="audioFileInput" multiple accept=".mp3,.wav,.m4a,.ogg,.flac,.webm,.aac,.wma,.opus,.oga,audio/*" style="display: none;">
+
             <!-- Dropzone para Múltiples Archivos de Audio -->
-            <div class="dropzone" id="audioDropzone" style="border-color: rgba(244, 63, 94, 0.35);">
-              <input type="file" id="audioFileInput" multiple accept=".mp3,.wav,.m4a,.ogg,.flac,.webm,.aac,audio/*" style="display: none;">
+            <div class="dropzone" id="audioDropzone" style="border-color: rgba(244, 63, 94, 0.35); cursor: pointer;">
               <div class="dropzone-icon" style="color: #fb7185;">🎙️</div>
               <div class="dropzone-text">
                 <strong>Arrastra tus archivos de audio aquí</strong> o haz clic para examinar
               </div>
               <div class="dropzone-formats">
-                MP3 · WAV · M4A · OGG · FLAC · AAC (Sube múltiples archivos simultáneamente)
+                MP3 · WAV · M4A · OGG · FLAC · AAC · WMA (Sube múltiples archivos a la vez)
               </div>
             </div>
 
@@ -486,7 +488,7 @@
                   Vaciar lista
                 </button>
               </div>
-              <div id="audioFilesList" style="max-height: 190px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; padding-right: 2px;">
+              <div id="audioFilesList" style="max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.45rem; padding-right: 2px;">
                 <!-- Elementos generados dinámicamente con JS -->
               </div>
             </div>
@@ -498,7 +500,7 @@
             </div>
 
             <!-- Botón para Proceder a Transcribir los Archivos de Audio Cargados -->
-            <div id="fileTranscribeActionWrapper" style="display: none; margin-top: 1rem;">
+            <div id="fileTranscribeActionWrapper" style="margin-top: 1rem;">
               <button id="btnTranscribeFile" class="btn btn-primary" style="width: 100%; justify-content: center; gap: 0.5rem; padding: 0.8rem 1.2rem; font-size: 0.95rem; font-weight: 600; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);">
                 <span id="btnTranscribeFileIcon">⚡</span>
                 <span id="btnTranscribeFileText">Proceder a Transcribir Archivos</span>

@@ -329,7 +329,7 @@ def stream_transcribe_audio_bytes(audio_bytes: bytes, filename: str = "", langua
                 "type": "done",
                 "progress": 100,
                 "message": "No se detectó voz audible en el archivo.",
-                "full_text": "No se detectó voz audible en el archivo de audio proporcionado.",
+                "full_text": "",
                 "segments": [],
                 "word_count": 0
             }
