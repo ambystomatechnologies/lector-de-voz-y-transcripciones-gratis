@@ -357,9 +357,22 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
   }
 
   function getGenderFromVoiceName(name) {
-    const maleKeywords = ["pablo", "raul", "jorge", "tomas", "gonzalo", "lorenzo", "marcelo", "manuel", "emilio", "luis", "rodrigo", "javier", "andres", "carlos", "federico", "roberto", "mario", "alex", "victor", "alonso", "mateo", "sebastian", "david", "male", "hombre", "juan", "alvaro"];
+    const maleKeywords = [
+      "alvaro", "jorge", "juan", "gonzalo", "tomas", "lorenzo", "marcelo", "manuel",
+      "emilio", "luis", "rodrigo", "javier", "andres", "carlos", "federico", "roberto",
+      "mario", "alex", "victor", "alonso", "mateo", "sebastian", "david", "pablo", "raul",
+      "male", "hombre", "diego", "miguel", "antonio", "francisco", "pedro"
+    ];
+    const femaleKeywords = [
+      "dalia", "elvira", "elena", "maria", "salome", "catalina", "sofia", "belkys",
+      "ramona", "andrea", "lorena", "teresa", "marta", "karla", "yolanda", "margarita",
+      "tania", "camila", "karina", "paloma", "valentina", "paola", "monica", "paulina",
+      "lucia", "carmen", "laura", "helena", "sabina", "female", "mujer"
+    ];
     const lower = (name || "").toLowerCase();
-    return maleKeywords.some(kw => lower.includes(kw)) ? "Hombre" : "Mujer";
+    if (maleKeywords.some(kw => lower.includes(kw))) return "Hombre";
+    if (femaleKeywords.some(kw => lower.includes(kw))) return "Mujer";
+    return "Mujer";
   }
 
   function renderFilteredVoices() {
@@ -367,12 +380,46 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
     const allSpVoices = ttsEngine.getSpanishVoices();
     voiceSelect.innerHTML = "";
 
-    // 1. Catálogo de voces con diferenciación Hombre / Mujer
+    // 1. Voces nativas del navegador (filtro inteligente)
+    if (allSpVoices.length > 0) {
+      let browserMatches = selectedLocale === "ALL" 
+        ? allSpVoices 
+        : allSpVoices.filter((v) => v.lang && v.lang.toLowerCase().startsWith(selectedLocale.toLowerCase()));
+
+      // Si el país específico no tiene voz en el navegador (ej. es-CR en Chrome),
+      // mostrar las voces naturales de mayor calidad disponibles en español
+      if (browserMatches.length === 0) {
+        browserMatches = allSpVoices.filter(v => !(v.name || "").toLowerCase().includes("desktop"));
+        if (browserMatches.length === 0) browserMatches = allSpVoices;
+      }
+
+      const optGroupBrowser = document.createElement("optgroup");
+      optGroupBrowser.label = "Voces del Navegador / Sistema";
+
+      browserMatches.forEach((v) => {
+        const opt = document.createElement("option");
+        opt.value = v.voiceURI;
+        const gender = getGenderFromVoiceName(v.name);
+        opt.setAttribute("data-gender", gender);
+        opt.setAttribute("data-locale", v.lang || selectedLocale);
+        const icon = gender === "Hombre" ? "👨" : "👩";
+        const isNatural = (v.name || "").toLowerCase().includes("natural") || (v.name || "").toLowerCase().includes("online") || (v.name || "").toLowerCase().includes("google");
+        const badge = isNatural ? "★ Fluida" : "Estándar";
+        opt.textContent = `${icon} ${v.name} (${badge})`;
+        optGroupBrowser.appendChild(opt);
+      });
+      voiceSelect.appendChild(optGroupBrowser);
+    }
+
+    // 2. Catálogo completo de voces neuronales (disponibles en servidor local o mapeables en navegador)
     const catalogVoices = selectedLocale === "ALL" 
       ? ORIGINAL_APP_VOICES 
       : ORIGINAL_APP_VOICES.filter((v) => v.locale === selectedLocale);
 
     if (catalogVoices.length > 0) {
+      const optGroupCatalog = document.createElement("optgroup");
+      optGroupCatalog.label = "Catálogo de Voces Neurales";
+
       catalogVoices.forEach((cv) => {
         const opt = document.createElement("option");
         opt.value = cv.shortName;
@@ -380,25 +427,9 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
         opt.setAttribute("data-locale", cv.locale);
         const icon = cv.gender === "Hombre" ? "👨" : "👩";
         opt.textContent = `${icon} ${cv.shortName} · ${cv.gender} · ${cv.locale}`;
-        voiceSelect.appendChild(opt);
+        optGroupCatalog.appendChild(opt);
       });
-    }
-
-    // 2. Agregar también las voces nativas reales del navegador
-    if (allSpVoices.length > 0) {
-      allSpVoices.forEach((v) => {
-        const matchesLocale = selectedLocale === "ALL" || (v.lang && v.lang.toLowerCase().startsWith(selectedLocale.toLowerCase()));
-        if (matchesLocale || catalogVoices.length === 0) {
-          const opt = document.createElement("option");
-          opt.value = v.voiceURI;
-          const gender = getGenderFromVoiceName(v.name);
-          opt.setAttribute("data-gender", gender);
-          opt.setAttribute("data-locale", v.lang || selectedLocale);
-          const icon = gender === "Hombre" ? "👨" : "👩";
-          opt.textContent = `${icon} ${v.name} (${gender} · Sistema)`;
-          voiceSelect.appendChild(opt);
-        }
-      });
+      voiceSelect.appendChild(optGroupCatalog);
     }
 
     // 3. Fallback si no hubiese opciones
@@ -477,18 +508,15 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
       return;
     }
 
-    // Sincronizar todos los ajustes actuales seleccionados por el usuario
-    applyVoiceSettings(false);
-
     if (ttsEngine.isPlaying) {
-      // Si el usuario presiona "Escuchar ahora" mientras se reproduce para oír sus cambios:
-      ttsEngine.stop();
-      ttsEngine.loadText(text);
-      buildReadingViewer();
-      ttsEngine.play(0);
-    } else if (ttsEngine.isPaused) {
+      // Pausar la lectura en vez de reiniciar
+      ttsEngine.pause();
+    } else if (ttsEngine.isPaused && ttsEngine.originalText === text) {
+      // Reanudar la lectura exactamente donde se pausó
       ttsEngine.resume();
     } else {
+      // Iniciar nueva lectura
+      applyVoiceSettings(false);
       ttsEngine.loadText(text);
       buildReadingViewer();
       ttsEngine.play(0);

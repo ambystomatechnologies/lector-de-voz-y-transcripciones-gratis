@@ -91,19 +91,29 @@ class TTSEngine {
   getSpanishVoices() {
     const spanish = this.voices.filter((v) => {
       const lang = (v.lang || "").toLowerCase();
-      return lang.startsWith("es") || lang.includes("spanish") || (v.name && v.name.toLowerCase().includes("spanish"));
+      const name = (v.name || "").toLowerCase();
+      return lang.startsWith("es") || lang.includes("spanish") || name.includes("spanish");
     });
 
     // Si no hay voces específicas en español, devolver todas
     if (spanish.length === 0) return this.voices;
 
-    // Ordenar: voces Naturales/Online primero, luego por nombre
+    // Ordenar con máxima prioridad a voces Naturales, Online y Neurales modernas.
+    // Penalizar fuertemente las voces Desktop antiguas (SAPI5 de Windows como Sabina o Raul Desktop).
     return spanish.sort((a, b) => {
-      const aNat = (a.name || "").toLowerCase().includes("natural") || (a.name || "").toLowerCase().includes("online");
-      const bNat = (b.name || "").toLowerCase().includes("natural") || (b.name || "").toLowerCase().includes("online");
-      if (aNat && !bNat) return -1;
-      if (!aNat && bNat) return 1;
-      return a.name.localeCompare(b.name);
+      const scoreVoice = (v) => {
+        const name = (v.name || "").toLowerCase();
+        let s = 0;
+        if (name.includes("natural")) s += 160;
+        if (name.includes("online")) s += 140;
+        if (name.includes("neural")) s += 150;
+        if (name.includes("google")) s += 110;
+        if (name.includes("premium") || name.includes("enhanced")) s += 90;
+        if (!name.includes("desktop")) s += 50;
+        if (name.includes("desktop")) s -= 300;
+        return s;
+      };
+      return scoreVoice(b) - scoreVoice(a);
     });
   }
 
@@ -114,32 +124,67 @@ class TTSEngine {
     if (locale) this.selectedLocale = locale;
     if (gender) this.selectedGender = gender;
     if (voiceUriOrName) this.selectedVoiceName = voiceUriOrName;
-    if (!voiceUriOrName) return;
+    if (!voiceUriOrName && !locale && !gender) return;
 
-    // 1. Intentar encontrar coincidencia directa por URI o nombre
+    // 1. Intentar encontrar coincidencia directa por URI o nombre exacto
     let found = this.voices.find(
       (v) => v.voiceURI === voiceUriOrName || v.name === voiceUriOrName
     );
 
-    // 2. Si no se encuentra (ej. ID de voz virtual de catálogo), buscar la mejor voz disponible del navegador que coincida con el género
+    // 2. Si no se encuentra (ej. ID de voz virtual de catálogo como 'es-CR-JuanNeural'):
     if (!found) {
       const spVoices = this.getSpanishVoices();
-      const maleKeywords = ["pablo", "raul", "jorge", "tomas", "gonzalo", "lorenzo", "marcelo", "manuel", "emilio", "luis", "rodrigo", "javier", "andres", "carlos", "federico", "roberto", "mario", "alex", "victor", "alonso", "mateo", "sebastian", "david", "male", "hombre"];
-      const femaleKeywords = ["helena", "laura", "sabina", "maria", "elvira", "dalia", "elena", "salome", "catalina", "sofia", "belkys", "ramona", "andrea", "lorena", "teresa", "marta", "karla", "yolanda", "margarita", "tania", "camila", "karina", "paloma", "valentina", "paola", "monica", "female", "mujer"];
+
+      // Descartar Desktop si hay voces modernas no-desktop disponibles en el sistema
+      const nonDesktop = spVoices.filter(v => !(v.name || "").toLowerCase().includes("desktop"));
+      const basePool = nonDesktop.length > 0 ? nonDesktop : spVoices;
+
+      // Nombres clave ampliados para hombre y mujer en voces modernas
+      const maleKeywords = [
+        "alvaro", "jorge", "juan", "gonzalo", "tomas", "lorenzo", "marcelo", "manuel",
+        "emilio", "luis", "rodrigo", "javier", "andres", "carlos", "federico", "roberto",
+        "mario", "alex", "victor", "alonso", "mateo", "sebastian", "david", "pablo", "raul",
+        "male", "hombre", "diego", "miguel", "antonio", "francisco", "pedro"
+      ];
+      const femaleKeywords = [
+        "dalia", "elvira", "elena", "maria", "salome", "catalina", "sofia", "belkys",
+        "ramona", "andrea", "lorena", "teresa", "marta", "karla", "yolanda", "margarita",
+        "tania", "camila", "karina", "paloma", "valentina", "paola", "monica", "paulina",
+        "lucia", "carmen", "laura", "helena", "sabina", "female", "mujer"
+      ];
+
+      // Intentar coincidir por país/locale si hay voces disponibles para ese país
+      const targetPrefix = (this.selectedLocale || "").toLowerCase();
+      let localeMatches = targetPrefix && targetPrefix !== "all"
+        ? basePool.filter(v => (v.lang || "").toLowerCase().startsWith(targetPrefix))
+        : [];
+
+      const searchPool = localeMatches.length > 0 ? localeMatches : basePool;
 
       if (this.selectedGender === "Hombre") {
-        found = spVoices.find(v => maleKeywords.some(kw => v.name.toLowerCase().includes(kw)));
+        found = searchPool.find(v => maleKeywords.some(kw => (v.name || "").toLowerCase().includes(kw)));
+        if (!found && searchPool !== basePool) {
+          found = basePool.find(v => maleKeywords.some(kw => (v.name || "").toLowerCase().includes(kw)));
+        }
       } else if (this.selectedGender === "Mujer") {
-        found = spVoices.find(v => femaleKeywords.some(kw => v.name.toLowerCase().includes(kw)));
+        found = searchPool.find(v => femaleKeywords.some(kw => (v.name || "").toLowerCase().includes(kw)));
+        if (!found && searchPool !== basePool) {
+          found = basePool.find(v => femaleKeywords.some(kw => (v.name || "").toLowerCase().includes(kw)));
+        }
       }
 
-      if (!found && spVoices.length > 0) {
-        found = spVoices[0];
+      // Si no se encuentra por nombre específico (ej. Google español en Chrome),
+      // seleccionar la primera voz de mayor calidad del searchPool o basePool
+      if (!found && searchPool.length > 0) {
+        found = searchPool[0];
+      } else if (!found && basePool.length > 0) {
+        found = basePool[0];
       }
     }
 
     if (found) {
       this.selectedVoice = found;
+      console.log(`[TTSEngine] Voz Web Speech activa: ${found.name} (${found.lang})`);
     }
   }
 
@@ -182,6 +227,7 @@ class TTSEngine {
    */
   loadText(fullText) {
     this.stop();
+    this.originalText = fullText;
     this.originalSentences = this.splitIntoSentences(fullText);
     this.sentences = [...this.originalSentences];
     this.currentIndex = 0;
@@ -250,14 +296,24 @@ class TTSEngine {
    */
   resume() {
     if (this.isPaused) {
-      if (this.useNeuralServer && this.audioElement && this.audioElement.src) {
-        this.audioElement.play().catch(e => console.warn(e));
-      } else if (this.synth) {
-        this.synth.resume();
-      }
       this.isPaused = false;
       this.isPlaying = true;
       this._notifyState();
+
+      if (this.useNeuralServer && this.audioElement && this.audioElement.src) {
+        this.audioElement.play().catch(e => console.warn(e));
+      } else if (this.synth) {
+        if (this.synth.speaking && this.synth.paused) {
+          this.synth.resume();
+        }
+        // Fallback de seguridad para Chromium: si tras 120ms no está hablando, reiniciar frase actual
+        setTimeout(() => {
+          if (this.isPlaying && !this.isPaused && (!this.synth.speaking || this.synth.paused)) {
+            if (this.synth) this.synth.cancel();
+            this._speakCurrentSentence();
+          }
+        }, 120);
+      }
     } else if (!this.isPlaying && this.sentences.length > 0) {
       this.play(this.currentIndex);
     }
@@ -460,13 +516,11 @@ class TTSEngine {
       utterance.lang = this.selectedLocale;
     }
 
-    // Cálculo del tono efectivo según el tono del usuario y el género
+    // Cálculo del tono efectivo:
+    // VOZ NATURAL Y FLUIDA:
+    // NUNCA aplicar multiplicadores artificiales (0.82 o 1.18) al pitch, ya que destruyen los formantes
+    // y hacen que las voces humanas suenen como sintetizadores robóticos y metálicos.
     let effectivePitch = this.pitch;
-    if (this.selectedGender === "Hombre") {
-      effectivePitch = effectivePitch * 0.82;
-    } else if (this.selectedGender === "Mujer") {
-      effectivePitch = effectivePitch * 1.18;
-    }
 
     utterance.rate = Math.max(0.5, Math.min(2.0, this.rate));
     utterance.pitch = Math.max(0.2, Math.min(2.0, effectivePitch));
