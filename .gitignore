@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.tmp
+*.wav
+*.mp3
+.tempmediaStorage/
+.system_generated/

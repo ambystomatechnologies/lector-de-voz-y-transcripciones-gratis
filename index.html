@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lector de voz &amp; transcripciones Ambystoma Technologies · Totalmente Gratuito</title>
+  <meta name="description" content="Lector de ebooks y textos a voz neural en español con corrección fonética y transcriptor de audio AI. Herramienta 100% gratuita, libre y privada desarrollada por Ambystoma Technologies.">
+  <meta name="keywords" content="lector de texto a voz gratis, totalmente gratuito, transcriptor de audio gratis, ambystoma technologies, text to speech español gratuito, epub a voz gratis, pdf a voz gratis">
+  <meta name="author" content="Ambystoma Technologies">
+  <meta name="theme-color" content="#0a0f1d">
+
+  <!-- Favicon Oficial con el Ícono de la Marca -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="alternate icon" href="favicon.ico">
+  <link rel="apple-touch-icon" href="favicon.svg">
+
+  <!-- Schema.org para Google Search: Aplicación Web Totalmente Gratuita -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Lector de voz & transcripciones Ambystoma Technologies",
+    "operatingSystem": "All",
+    "applicationCategory": "MultimediaApplication",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "description": "Herramienta totalmente gratuita de lectura de texto a voz con corrección fonética y transcripción de audio.",
+    "author": {
+      "@type": "Organization",
+      "name": "Ambystoma Technologies"
+    }
+  }
+  </script>
+
+  <!-- Tipografía Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Estilos CSS Dark Mode -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Librerías Externas para Lectura Cliente de Formatos (Sin Servidor) -->
+  <!-- SheetJS: Importar y Exportar Diccionarios Excel (.xlsx) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- PDF.js: Extracción de texto de documentos PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (typeof pdfjsLib !== "undefined") {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+  </script>
+  <!-- Mammoth: Extracción de texto de documentos Word DOCX -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <!-- JSZip: Extracción y descompresión de libros EPUB -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+
+  <!-- =========================================================================
+       Encabezado Principal del Sitio
+       ========================================================================= -->
+  <header class="site-header">
+    <div class="header-container">
+      <a href="#" class="brand-wrapper" title="Ambystoma Technologies - Inicio">
+        <div class="brand-icon-box">🔊</div>
+        <div class="brand-info">
+          <h1 class="brand-title">Lector de voz &amp; transcripciones<br>Ambystoma Technologies</h1>
+        </div>
+      </a>
+
+      <!-- Logo Central de Ambystoma Technologies en el espacio disponible -->
+      <div class="header-logo-container" title="Ambystoma Technologies">
+        <img src="logo.png" alt="Ambystoma Technologies - Science and Technology Applications" class="header-brand-logo">
+      </div>
+
+      <!-- Conmutador de Modos: Texto a Voz / Transcribir Audio -->
+      <nav class="mode-nav">
+        <button id="navBtnTTS" class="mode-btn active" title="Lector de Texto y Ebooks a Voz">
+          <span>🔊</span> <span>Texto a Voz</span>
+        </button>
+        <button id="navBtnTranscribe" class="mode-btn" title="Transcribir Archivos de Audio o Micrófono a Texto">
+          <span>🎙️</span> <span>Transcribir Audio</span>
+        </button>
+      </nav>
+
+      <div class="header-actions">
+        <button id="btnOpenDict" class="btn btn-secondary" title="Abrir Diccionario de Pronunciación">
+          <span>📖</span> <span class="hide-mobile">Diccionario</span>
+        </button>
+        <button id="btnOpenAbout" class="btn btn-glass" title="Acerca de Ambystoma Technologies">
+          <span>ℹ️</span> <span class="hide-mobile">About</span>
+        </button>
+        <button id="btnOpenHelp" class="btn btn-glass" title="Instrucciones y GitHub Pages">
+          <span>❓</span> <span class="hide-mobile">Ayuda</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       Espacio Publicitario 1: Banner Superior (Header Ad)
+       ========================================================================= -->
+  <div class="main-wrapper" style="padding-bottom: 0;">
+    <div class="ad-slot-wrapper">
+      <span class="ad-label">Publicidad</span>
+      <div class="ad-container ad-header-banner" id="ad-slot-top">
+        <!-- 
+          =============================================================
+          ESPACIO RESERVADO PARA GOOGLE ADSENSE U OTRA RED PUBLICITARIA
+          Pega tu etiqueta <ins class="adsbygoogle" ...></ins> aquí.
+          =============================================================
+        -->
+        <div class="ad-placeholder-content">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+          <span>Espacio Publicitario Reservado · Banner Superior (Responsive / 728x90)</span>
+          <small>Inserte aquí su bloque de anuncios de Google AdSense</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       Área de Trabajo Principal (Workspace Grid)
+       ========================================================================= -->
+  <main class="main-wrapper">
+    <!-- =====================================================================
+         VISTA 1: LECTOR DE TEXTO A VOZ (TTS)
+         ===================================================================== -->
+    <div id="viewTTS" class="app-view">
+      <div class="workspace-grid">
+
+        <!-- ===================================================================
+             Columna Izquierda: Cargar Documento, Editor y Visor de Lectura
+             =================================================================== -->
+        <section class="left-column">
+        
+          <!-- Tarjeta de Carga de Archivo -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <div class="card-icon">📂</div>
+                <div>
+                  <h2 class="card-title">1 · Cargar Libro o Documento</h2>
+                  <p class="card-subtitle">Formatos: TXT, EPUB, PDF, DOCX, HTML, MD, CSV, SRT, RTF</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Dropzone para arrastrar y soltar archivos -->
+            <div class="dropzone" id="dropzone">
+              <input type="file" id="fileInput" accept=".txt,.md,.epub,.pdf,.docx,.html,.htm,.csv,.srt,.vtt,.rtf" style="display: none;">
+              <div class="dropzone-icon">📥</div>
+              <div class="dropzone-text">
+                <strong>Arrastra y suelta tu archivo aquí</strong> o haz clic para examinar
+              </div>
+              <div class="dropzone-formats">
+                PDF · EPUB · DOCX (Word) · TXT · HTML · Markdown · Subtítulos
+              </div>
+            </div>
+
+            <!-- Badge con nombre de archivo cargado -->
+            <div id="fileBadge" class="file-info-badge" style="margin-top: 0.75rem;">
+              <span>📄</span>
+              <span id="fileNameDisplay" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+            </div>
+          </div>
+
+          <!-- Tarjeta del Editor y Visor de Lectura -->
+          <div class="card" style="flex: 1;">
+            <div class="card-header">
+              <div class="card-title-group">
+                <div class="card-icon">📝</div>
+                <div>
+                  <h2 class="card-title">2 · Texto y Vista Previa</h2>
+                  <p class="card-subtitle">Edita o sigue la lectura en tiempo real</p>
+                </div>
+              </div>
+
+              <!-- Pestañas para alternar entre edición y modo lectura con resaltado -->
+              <div class="view-tabs">
+                <button id="tabEditor" class="tab-btn active" title="Editar texto">✏️ Editor</button>
+                <button id="tabReading" class="tab-btn" title="Modo Lectura con Resaltado">📖 Modo Lectura</button>
+              </div>
+            </div>
+
+            <!-- Contenedor del Editor de Texto -->
+            <div class="text-area-container">
+              <textarea id="mainTextarea" class="main-textarea" placeholder="Escribe o pega aquí el texto que deseas escuchar en voz alta...&#10;También puedes arrastrar o abrir cualquier archivo PDF, EPUB o Word arriba."></textarea>
+              
+              <!-- Visor de Lectura Activa con Resaltado Sincronizado -->
+              <div id="readingViewer" class="reading-viewer"></div>
+            </div>
+
+            <!-- Barra de Herramientas del Texto -->
+            <div class="text-toolbar">
+              <div class="text-stats">
+                <span id="charCount">0 caracteres</span>
+                <span>•</span>
+                <span id="wordCount">0 palabras</span>
+                <span>•</span>
+                <span id="readingTime">~ 0 min de lectura</span>
+              </div>
+
+              <div class="text-actions-bar">
+                <button id="btnSampleText" class="btn btn-glass btn-sm" title="Cargar texto de prueba con nombres fantásticos">
+                  <span>✨ Ejemplo</span>
+                </button>
+                <button id="btnCleanText" class="btn btn-glass btn-sm" title="Limpiar saltos innecesarios y caracteres invisibles">
+                  <span>🧹 Limpiar Formato</span>
+                </button>
+                <button id="btnClearText" class="btn btn-glass btn-sm" title="Borrar todo el texto">
+                  <span>🗑️ Vaciar</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- ===================================================================
+             Columna Derecha: Controles de Reproducción, Voz, Diccionario y Ads
+             =================================================================== -->
+        <section class="right-column">
+
+          <!-- Tarjeta de Controles de Reproducción (Audio Player) -->
+          <div class="card playback-card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <div class="card-icon">⚡</div>
+                <div>
+                  <h2 class="card-title">3 · Reproducción de Voz</h2>
+                  <p class="card-subtitle">Control en tiempo real con Web Speech API</p>
+                </div>
+              </div>
+
+              <!-- Visualizador de Barras de Audio Animadas -->
+              <div class="audio-visualizer-box" id="visualizerBars" title="Ondas de audio en vivo">
+                <div class="eq-bar"></div>
+                <div class="eq-bar"></div>
+                <div class="eq-bar"></div>
+                <div class="eq-bar"></div>
+                <div class="eq-bar"></div>
+                <div class="eq-bar"></div>
+              </div>
+            </div>
+
+            <!-- Botón Principal PLAY Grande -->
+            <button id="btnBigPlay" class="btn btn-primary big-play-btn">
+              <span>▶</span> <span>Escuchar Texto Ahora</span>
+            </button>
+
+            <!-- Fila de Controles Secundarios: Pausa, Reanudar, Detener, Saltar Frases -->
+            <div class="playback-controls-row">
+              <button id="btnPause" class="btn btn-secondary" title="Pausar lectura">
+                <span>⏸</span> <span>Pausar</span>
+              </button>
+              <button id="btnResume" class="btn btn-secondary" title="Reanudar lectura">
+                <span>⏯</span> <span>Reanudar</span>
+              </button>
+              <button id="btnPrev" class="btn btn-secondary" title="Frase anterior">
+                <span>⏮</span> <span>Anterior</span>
+              </button>
+              <button id="btnNext" class="btn btn-secondary" title="Siguiente frase">
+                <span>⏭</span> <span>Siguiente</span>
+              </button>
+            </div>
+
+            <!-- Botón de Parada Total -->
+            <div style="margin-bottom: 0.85rem;">
+              <button id="btnStop" class="btn btn-glass" style="width: 100%;" title="Detener reproducción por completo">
+                <span>⏹</span> <span>Detener por Completo</span>
+              </button>
+            </div>
+
+            <!-- Barra de Progreso de la Lectura -->
+            <div class="progress-container">
+              <div class="progress-track" id="progressTrack">
+                <div class="progress-fill" id="progressFill"></div>
+              </div>
+              <div class="progress-info">
+                <span id="progressText">0 / 0 frases</span>
+                <span id="progressPercent">0%</span>
+              </div>
+            </div>
+
+            <!-- Indicador de Estado -->
+            <div class="status-indicator">
+              <div class="status-dot" id="statusDot"></div>
+              <span id="statusText">Listo para reproducir.</span>
+            </div>
+          </div>
+
+          <!-- Tarjeta de Configuración de Voz Neural y Efectos -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <div class="card-icon">🎙️</div>
+                <div>
+                  <h2 class="card-title">4 · Ajustes de Voz</h2>
+                  <p class="card-subtitle">Personaliza acento, velocidad y entonación</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Filtro por País / Acento -->
+            <div class="form-group">
+              <label class="form-label" for="localeFilter">
+                <span>Acento o País:</span>
+              </label>
+              <select id="localeFilter" class="select-control">
+                <option value="ALL">Todos los acentos</option>
+              </select>
+            </div>
+
+            <!-- Selector de Voz -->
+            <div class="form-group">
+              <label class="form-label" for="voiceSelect">
+                <span>Voz en Español:</span>
+              </label>
+              <select id="voiceSelect" class="select-control">
+                <option value="">Cargando voces del navegador...</option>
+              </select>
+            </div>
+
+            <!-- Control de Velocidad (Rate) -->
+            <div class="form-group">
+              <div class="form-label">
+                <span>Velocidad de Lectura:</span>
+                <span class="val-badge" id="rateVal">1.0x</span>
+              </div>
+              <input type="range" id="rateSlider" class="slider-control" min="0.5" max="2.0" step="0.1" value="1.0">
+            </div>
+
+            <!-- Control de Tono (Pitch) -->
+            <div class="form-group">
+              <div class="form-label">
+                <span>Tono de Voz:</span>
+                <span class="val-badge" id="pitchVal">1.0</span>
+              </div>
+              <input type="range" id="pitchSlider" class="slider-control" min="0.5" max="1.5" step="0.1" value="1.0">
+            </div>
+
+            <!-- Control de Volumen -->
+            <div class="form-group">
+              <div class="form-label">
+                <span>Volumen:</span>
+                <span class="val-badge" id="volumeVal">100%</span>
+              </div>
+              <input type="range" id="volumeSlider" class="slider-control" min="0.0" max="1.0" step="0.05" value="1.0">
+            </div>
+          </div>
+
+          <!-- Tarjeta Resumen de Pronunciación Fonética -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <div class="card-icon">📚</div>
+                <div>
+                  <h2 class="card-title">5 · Diccionario Fonético</h2>
+                  <p class="card-subtitle">Corrige nombres y palabras (ej. apple → apel)</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="dict-summary-card">
+              <div class="dict-counter">
+                <span>Reglas activas:</span>
+                <span class="dict-badge" id="dictCountBadge">56 reglas</span>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="document.getElementById('btnOpenDict').click()">
+                <span>Administrar</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Botón para Descargar Audio con Indicador de Carga -->
+          <div class="card" style="text-align: center;">
+            <button id="btnDownloadAudio" class="btn btn-accent" style="width: 100%;">
+              <span id="downloadBtnIcon">💾</span> <span id="downloadBtnText">Descargar Archivo de Audio</span>
+            </button>
+
+            <!-- Indicador y Barra de Carga Animada mientras se procesa el audio -->
+            <div id="downloadLoadingBox" class="download-loading-box" style="display: none; margin-top: 0.75rem;">
+              <div class="download-spinner-row">
+                <div class="loading-spinner"></div>
+                <span id="downloadLoadingText" style="font-size: 0.82rem; color: #38bdf8; font-weight: 600;">
+                  Sintetizando audio... por favor espera unos segundos
+                </span>
+              </div>
+              <div class="progress-track" style="margin-top: 0.55rem; height: 6px; background: rgba(255,255,255,0.08); border-radius: 9999px; overflow: hidden;">
+                <div class="download-progress-active" style="width: 100%; height: 100%;"></div>
+              </div>
+            </div>
+
+            <small id="downloadSubtext" style="display: block; margin-top: 0.45rem; color: var(--text-muted); font-size: 0.72rem;">
+              Guarda el audio sintetizado (.mp3 / .wav) con los ajustes y pronunciación actual
+            </small>
+          </div>
+
+          <!-- Espacio Publicitario Lateral (Sidebar Ad) -->
+          <div class="ad-slot-wrapper">
+            <span class="ad-label">Publicidad</span>
+            <div class="ad-container ad-sidebar-box" id="ad-slot-sidebar">
+              <div class="ad-placeholder-content">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <span>Espacio Publicitario Lateral (300x250)</span>
+                <small>Compatible con banners cuadrados o responsivos</small>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+      </div>
+    </div> <!-- Fin viewTTS -->
+
+    <!-- =====================================================================
+         VISTA 2: TRANSCRIPTOR DE AUDIO (VOZ A TEXTO)
+         ===================================================================== -->
+    <div id="viewTranscribe" class="app-view hidden">
+      <div class="workspace-grid">
+
+        <!-- Columna Izquierda: Entrada de Audio y Grabación -->
+        <section class="left-column">
+          <!-- Tarjeta de Carga de Archivo de Audio -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <div class="card-icon" style="background: rgba(244, 63, 94, 0.15); color: #fb7185;">🎵</div>
+                <div>
+                  <h2 class="card-title">1 · Cargar Archivo de Audio</h2>
+                  <p class="card-subtitle">Formatos: MP3, WAV, M4A, OGG, FLAC, WEBM, AAC</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Dropzone para Archivos de Audio -->
+            <div class="dropzone" id="audioDropzone" style="border-color: rgba(244, 63, 94, 0.35);">
+              <input type="file" id="audioFileInput" accept=".mp3,.wav,.m4a,.ogg,.flac,.webm,.aac,audio/*" style="display: none;">
+              <div class="dropzone-icon" style="color: #fb7185;">🎙️</div>
+              <div class="dropzone-text">
+                <strong>Arrastra tu archivo de audio aquí</strong> o haz clic para examinar
+              </div>
+              <div class="dropzone-formats">
+                MP3 · WAV · M4A · OGG · FLAC · Grabaciones de voz
+              </div>
+            </div>
+
+            <!-- Badge y Reproductor de Audio Embebido -->
+            <div id="audioFileBadge" class="file-info-badge" style="display: none; margin-top: 0.75rem; background: rgba(244, 63, 94, 0.15); border-color: rgba(244, 63, 94, 0.35); color: #fb7185;">
+              <span>🎵</span>
+              <span id="audioFileNameDisplay" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+            </div>
+
+            <div id="audioPlayerWrapper" class="audio-player-container" style="display: none; margin-top: 0.75rem;">
+              <audio id="audioPreviewPlayer" controls style="width: 100%;"></audio>
+            </div>
+
+            <!-- Botón para Proceder a Transcribir el Archivo de Audio Cargado -->
+            <div id="fileTranscribeActionWrapper" style="margin-top: 1rem;">
+              <button id="btnTranscribeFile" class="btn btn-primary" style="width: 100%; justify-content: center; gap: 0.5rem; padding: 0.8rem 1.2rem; font-size: 0.95rem; font-weight: 600; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);">
+                <span id="btnTranscribeFileIcon">⚡</span>
+                <span id="btnTranscribeFileText">Proceder a Transcribir Archivo</span>
+              </button>
+
+              <!-- Indicador de Carga y Progreso REAL de la Transcripción -->
+              <div id="fileTranscribeLoadingBox" class="download-loading-box" style="display: none; margin-top: 0.85rem; padding: 0.85rem; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px;">
+                <div class="download-spinner-row" style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <div class="loading-spinner"></div>
+                    <span id="fileTranscribeLoadingText" style="font-size: 0.85rem; color: #38bdf8; font-weight: 600;">
+                      Transcribiendo audio con IA...
+                    </span>
+                  </div>
+                  <span id="fileTranscribeProgressPct" style="font-size: 0.88rem; color: #38bdf8; font-weight: 700; font-family: monospace;">
+                    0%
+                  </span>
+                </div>
+                <!-- Barra de Progreso Real -->
+                <div class="progress-track" style="margin-top: 0.65rem; height: 10px; background: rgba(255,255,255,0.08); border-radius: 9999px; overflow: hidden;">
+                  <div id="fileTranscribeRealProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #3b82f6, #06b6d4, #10b981); transition: width 0.3s ease; border-radius: 9999px;"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.45rem;">
+                  <span id="fileTranscribeTimeDisplay" style="font-size: 0.76rem; color: #94a3b8; font-family: monospace;">
+                    Tiempo: 00:00 / 00:00
+                  </span>
+                  <span style="font-size: 0.74rem; color: #38bdf8; font-weight: 500;">
+                    ⚡ En Vivo · Whisper IA
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tarjeta de Grabación en Vivo por Micrófono -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <div class="card-icon">🎙️</div>
+                <div>
+                  <h2 class="card-title">2 · Dictado / Grabación en Vivo</h2>
+                  <p class="card-subtitle">Transcribe reuniones, notas de voz o dictados al instante</p>
+                </div>
+              </div>
+              <div class="status-indicator">
+                <div class="status-dot" id="recStatusDot"></div>
+                <span id="recTimerDisplay">00:00</span>
+              </div>
+            </div>
+
+            <!-- Botón Grande de Grabación / Transcripción -->
+            <button id="btnToggleRecord" class="btn record-btn">
+              <span>🎙️</span> <span id="btnRecordText">Iniciar Grabación y Transcripción</span>
+            </button>
+
+            <!-- Selector Rápido de Hablante Activo -->
+            <div class="speaker-selector-row">
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Hablante Activo:</span>
+              <button id="btnSpeaker1" class="speaker-btn active spk-1">🗣️ Hablante 1</button>
+              <button id="btnSpeaker2" class="speaker-btn spk-2">🗣️ Hablante 2</button>
+            </div>
+            
+            <p style="font-size: 0.75rem; color: var(--text-muted);">
+              💡 Puedes alternar entre Hablante 1 y Hablante 2 mientras hablas para clasificar el diálogo.
+            </p>
+          </div>
+        </section>
+
+        <!-- Columna Derecha: Opciones y Resultado de Transcripción -->
+        <section class="right-column">
+          <!-- Tarjeta de Opciones de Transcripción -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title-group">
+                <div class="card-icon">⚙️</div>
+                <div>
+                  <h2 class="card-title">3 · Configuración de Transcripción</h2>
+                  <p class="card-subtitle">Formato de salida y diferenciación</p>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label" for="transcribeLangSelect">Idioma del Audio:</label>
+                <select id="transcribeLangSelect" class="select-control">
+                  <option value="es-CR">Costa Rica (es-CR) 🇨🇷</option>
+                  <option value="es-ES">España (es-ES) 🇪🇸</option>
+                  <option value="es-MX">México (es-MX) 🇲🇽</option>
+                  <option value="es-AR">Argentina (es-AR) 🇦🇷</option>
+                  <option value="es-CO">Colombia (es-CO) 🇨🇴</option>
+                  <option value="es-CL">Chile (es-CL) 🇨🇱</option>
+                  <option value="es-BO">Bolivia (es-BO) 🇧🇴</option>
+                  <option value="es-CU">Cuba (es-CU) 🇨🇺</option>
+                  <option value="es-DO">República Dominicana (es-DO) 🇩🇴</option>
+                  <option value="es-EC">Ecuador (es-EC) 🇪🇨</option>
+                  <option value="es-SV">El Salvador (es-SV) 🇸🇻</option>
+                  <option value="es-GQ">Guinea Ecuatorial (es-GQ) 🇬🇶</option>
+                  <option value="es-GT">Guatemala (es-GT) 🇬🇹</option>
+                  <option value="es-HN">Honduras (es-HN) 🇭🇳</option>
+                  <option value="es-NI">Nicaragua (es-NI) 🇳🇮</option>
+                  <option value="es-PA">Panamá (es-PA) 🇵🇦</option>
+                  <option value="es-PY">Paraguay (es-PY) 🇵🇾</option>
+                  <option value="es-PE">Perú (es-PE) 🇵🇪</option>
+                  <option value="es-PR">Puerto Rico (es-PR) 🇵🇷</option>
+                  <option value="es-US">Estados Unidos (es-US) 🇺🇸</option>
+                  <option value="es-UY">Uruguay (es-UY) 🇺🇾</option>
+                  <option value="es-VE">Venezuela (es-VE) 🇻🇪</option>
+                  <option value="en-US">Inglés (Estados Unidos) 🇺🇸</option>
+                </select>
+              </div>
+
+              <div style="display: flex; flex-direction: column; justify-content: center; gap: 0.4rem;">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="chkDifferentiateSpeakers" checked>
+                  <span>Diferenciar Hablantes</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="chkIncludeTimestamps" checked>
+                  <span>Marcas de tiempo [MM:SS]</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tarjeta de Texto Transcrito -->
+          <div class="card" style="flex: 1;">
+            <div class="card-header">
+              <div class="card-title-group">
+                <div class="card-icon">📄</div>
+                <div>
+                  <h2 class="card-title">4 · Texto Transcrito</h2>
+                  <p class="card-subtitle">Resultado generado en tiempo real</p>
+                </div>
+              </div>
+              <div id="transcribeWordCount" style="font-size: 0.8rem; color: var(--text-muted);">
+                0 palabras
+              </div>
+            </div>
+
+            <!-- Área de Texto de la Transcripción -->
+            <textarea id="transcriptionOutput" class="transcription-textarea" placeholder="Aquí aparecerá el texto transcrito de tu audio o dictado...&#10;&#10;Ejemplo con formato:&#10;[00:03] Hablante 1: Buenos días, comenzamos la sesión.&#10;[00:07] Hablante 2: Perfecto, revisemos los puntos acordados."></textarea>
+
+            <!-- Acciones y Exportación -->
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.85rem;">
+              <button id="btnExportTxt" class="btn btn-primary btn-sm" title="Guardar transcripción como archivo .txt">
+                <span>💾</span> <span>Guardar en .TXT</span>
+              </button>
+              <button id="btnCopyTranscript" class="btn btn-secondary btn-sm" title="Copiar texto al portapapeles">
+                <span>📋</span> <span>Copiar</span>
+              </button>
+              <button id="btnSendToTTS" class="btn btn-accent btn-sm" title="Enviar este texto al Lector de Voz para escucharlo">
+                <span>🔊</span> <span>Enviar a Texto a Voz ➔</span>
+              </button>
+              <button id="btnClearTranscript" class="btn btn-glass btn-sm" style="margin-left: auto;" title="Limpiar transcripción">
+                <span>🗑️</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div> <!-- Fin viewTranscribe -->
+
+    <!-- =========================================================================
+         Espacio Publicitario 3: Banner Inferior (Footer Banner Ad)
+         ========================================================================= -->
+    <div class="ad-slot-wrapper" style="margin-top: 1.5rem;">
+      <span class="ad-label">Publicidad</span>
+      <div class="ad-container ad-footer-banner" id="ad-slot-bottom">
+        <!-- 
+          =============================================================
+          ESPACIO RESERVADO PARA GOOGLE ADSENSE U OTRA RED PUBLICITARIA
+          Pega tu etiqueta <ins class="adsbygoogle" ...></ins> aquí.
+          =============================================================
+        -->
+        <div class="ad-placeholder-content">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+          <span>Espacio Publicitario Inferior (Leaderboard / Responsive 728x90)</span>
+          <small>Inserte aquí su bloque de anuncios de Google AdSense</small>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- =========================================================================
+       Modal: Administrador del Diccionario Fonético
+       ========================================================================= -->
+  <div class="modal-backdrop" id="dictModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="card-title-group">
+          <div class="card-icon">📖</div>
+          <div>
+            <h2 class="card-title">Diccionario de Pronunciación Personalizada</h2>
+            <p class="card-subtitle">Evita deletreos en nombres extraños de libros y fantasía</p>
+          </div>
+        </div>
+        <button id="btnCloseDict" class="btn btn-glass btn-icon" title="Cerrar modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Formulario para Agregar Nueva Regla -->
+        <div class="dict-input-row">
+          <input type="text" id="inputWritten" class="input-control" placeholder="Texto en el libro (ej. apple)">
+          <input type="text" id="inputSpoken" class="input-control" placeholder="Cómo debe sonar (ej. apel)">
+          <button id="btnAddRule" class="btn btn-primary">
+            <span>+ Agregar</span>
+          </button>
+        </div>
+
+        <!-- Búsqueda rápida en el diccionario -->
+        <div style="margin-bottom: 0.75rem;">
+          <input type="text" id="dictSearch" class="input-control" style="width: 100%;" placeholder="🔍 Buscar regla en el diccionario...">
+        </div>
+
+        <!-- Tabla con las Reglas -->
+        <div class="dict-table-container">
+          <table class="dict-table">
+            <thead>
+              <tr>
+                <th>Texto en el Libro</th>
+                <th>Cómo debe sonar (Fonética)</th>
+                <th style="width: 60px; text-align: right;">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="dictTableBody">
+              <!-- Rellenado dinámicamente por app.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display: none;">
+          <button id="btnImportExcel" class="btn btn-secondary btn-sm" title="Importar archivo .xlsx con columnas Texto y Fonética">
+            <span>📥 Importar Excel</span>
+          </button>
+          <button id="btnExportExcel" class="btn btn-glass btn-sm" title="Exportar diccionario actual a Excel">
+            <span>📤 Exportar Excel</span>
+          </button>
+          <button id="btnExportJSON" class="btn btn-glass btn-sm" title="Exportar diccionario como JSON">
+            <span>💾 Exportar JSON</span>
+          </button>
+        </div>
+        <button id="btnResetDict" class="btn btn-danger btn-sm" title="Restablecer diccionario a valores iniciales">
+          <span>Restablecer</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       Modal: Ayuda, Publicidad & Guía para GitHub Pages
+       ========================================================================= -->
+  <div class="modal-backdrop" id="helpModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="card-title-group">
+          <div class="card-icon">🚀</div>
+          <div>
+            <h2 class="card-title">LectorVoz Pro · Guía de Publicación y Uso</h2>
+            <p class="card-subtitle">Cómo subir a GitHub Pages y configurar tu publicidad</p>
+          </div>
+        </div>
+        <button id="btnCloseHelp" class="btn btn-glass btn-icon">✕</button>
+      </div>
+
+      <div class="modal-body" style="font-size: 0.9rem; line-height: 1.7; color: #cbd5e1;">
+        <h3 style="color: #38bdf8; margin-bottom: 0.45rem;">1. ¿Cómo publicar en GitHub Pages?</h3>
+        <p style="margin-bottom: 1rem;">
+          Esta aplicación web está diseñada para ser 100% estática:
+        </p>
+        <ol style="margin-left: 1.25rem; margin-bottom: 1rem;">
+          <li>Sube los archivos de este directorio a tu repositorio de GitHub (ejemplo: <code>git add .</code>, <code>git commit -m "Web app"</code>, <code>git push</code>).</li>
+          <li>En tu repositorio en GitHub, dirígete a <strong>Settings → Pages</strong>.</li>
+          <li>En <strong>Branch</strong>, selecciona <code>main</code> (o <code>master</code>) y la carpeta <code>/ (root)</code>.</li>
+          <li>Haz clic en <strong>Save</strong>. ¡En 1 minuto tu aplicación estará disponible online en una dirección gratuita <code>https://tu-usuario.github.io/tu-repo/</code>!</li>
+        </ol>
+
+        <h3 style="color: #38bdf8; margin-bottom: 0.45rem;">2. ¿Cómo configurar Google AdSense o Anuncios?</h3>
+        <p style="margin-bottom: 1rem;">
+          En el archivo <code>index.html</code> encontrarás tres bloques etiquetados claramente:
+          <br>• <code>#ad-slot-top</code> (Banner superior)
+          <br>• <code>#ad-slot-sidebar</code> (Banner lateral 300x250)
+          <br>• <code>#ad-slot-bottom</code> (Banner inferior)
+          <br>Simplemente reemplaza el bloque de ejemplo con la etiqueta <code>&lt;ins class="adsbygoogle" ...&gt;</code> que te proporcione Google AdSense.
+        </p>
+
+        <h3 style="color: #38bdf8; margin-bottom: 0.45rem;">3. Atajos de Teclado</h3>
+        <ul style="margin-left: 1.25rem;">
+          <li><kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px;">Barra Espaciadora</kbd>: Reproducir / Pausar</li>
+          <li><kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px;">Esc</kbd>: Detener reproducción</li>
+          <li><kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px;">Flecha Derecha</kbd>: Siguiente oración</li>
+          <li><kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px;">Flecha Izquierda</kbd>: Oración anterior</li>
+        </ul>
+      </div>
+
+      <div class="modal-footer" style="justify-content: flex-end;">
+        <button class="btn btn-primary" onclick="document.getElementById('helpModal').classList.remove('open')">
+          Entendido
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       Modal: Acerca de / About (Ambystoma Technologies)
+       ========================================================================= -->
+  <div class="modal-backdrop" id="aboutModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="card-title-group">
+          <div class="card-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">🦎</div>
+          <div>
+            <h2 class="card-title">Acerca de Ambystoma Pro</h2>
+            <p class="card-subtitle">Ambystoma Technologies · Science and Technology Applications</p>
+          </div>
+        </div>
+        <button id="btnCloseAbout" class="btn btn-glass btn-icon" title="Cerrar modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div style="text-align: center; margin-bottom: 1.25rem;">
+          <img src="logo.png" alt="Ambystoma Technologies" style="max-height: 54px; max-width: 90%; object-fit: contain; margin-bottom: 0.75rem;">
+          <h3 style="color: #f8fafc; font-size: 1.15rem; margin-bottom: 0.25rem;">Lector de voz &amp; transcripciones Ambystoma Pro</h3>
+          <p style="color: var(--text-secondary); font-size: 0.88rem;">
+            Herramienta desarrollada por <strong>Ambystoma Technologies</strong>.
+          </p>
+          <div style="margin-top: 0.85rem;">
+            <a href="mailto:ambystomatechnologies@gmail.com" class="about-contact-box" title="Enviar correo a Ambystoma Technologies">
+              <span>✉️</span> <span>ambystomatechnologies@gmail.com</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Aviso Destacado de Uso Totalmente Gratuito -->
+        <div class="about-free-banner" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: var(--radius-sm); padding: 0.85rem 1rem; margin-bottom: 1rem; text-align: left;">
+          <h4 style="color: #34d399; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem; font-size: 0.95rem;">
+            <span>✨</span> <span>Herramienta y Sitio Web 100% Totalmente Gratuito</span>
+          </h4>
+          <p style="color: #e2e8f0; font-size: 0.84rem; line-height: 1.5; margin: 0;">
+            El uso de esta plataforma es <strong>completamente gratuito y de libre acceso</strong>. No requiere ningún tipo de registro, no contiene suscripciones de pago ni tarifas ocultas. Puedes leer libros, novelas y documentos ilimitados, transcribir tus audios o dictados y descargar tus archivos de audio de forma totalmente gratuita.
+          </p>
+        </div>
+
+        <!-- Descargo de Responsabilidad y Privacidad Absoluta -->
+        <div class="about-disclaimer">
+          <h4 style="color: #38bdf8; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+            <span>🔒</span> <span>100% Privado y Procesamiento Local en tu Dispositivo</span>
+          </h4>
+          <p style="margin-bottom: 0.85rem;">
+            Esta herramienta opera de manera <strong>estrictamente local</strong> en el navegador de tu computadora o teléfono celular. Todos los archivos (documentos PDF, libros EPUB, archivos Word DOCX, audios o dictados de voz) se procesan directamente en la memoria de tu dispositivo mediante las APIs nativas del navegador (Web Speech API, PDF.js, Mammoth.js, JSZip). <strong>Ningún archivo, texto o audio se envía, recopila, transmite o almacena en servidores externos</strong>, garantizando confidencialidad y privacidad absoluta.
+          </p>
+
+          <h4 style="color: #fb7185; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem;">
+            <span>⚖️</span> <span>Exención y Descargo de Responsabilidad por Derechos de Autor</span>
+          </h4>
+          <p style="margin-bottom: 0.5rem;">
+            <strong>Ambystoma Technologies</strong> pone a disposición esta plataforma como una herramienta neutra de asistencia tecnológica, lectura y transcripción. <strong>Ambystoma Technologies no se hace responsable por el contenido, procedencia o posibles infracciones a las leyes de propiedad intelectual o derechos de autor</strong> derivadas de los archivos, libros, textos o audios que los usuarios decidan cargar, procesar o sintetizar.
+          </p>
+          <p>
+            El usuario asume toda la responsabilidad legal respecto al material que utiliza en esta aplicación y declara contar con los derechos, permisos o excepciones de uso personal necesarias para su utilización.
+          </p>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="justify-content: flex-end;">
+        <button class="btn btn-primary" onclick="document.getElementById('aboutModal').classList.remove('open')">
+          Entendido
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       Pie de Página (Footer)
+       ========================================================================= -->
+  <footer class="site-footer">
+    <div class="footer-content">
+      <p>🔊 <strong>Lector de voz &amp; transcripciones Ambystoma Pro</strong> · Desarrollado por <strong>Ambystoma Technologies</strong>.</p>
+      <p style="color: #475569; font-size: 0.75rem;">Contacto: <a href="mailto:ambystomatechnologies@gmail.com" style="color: #64748b; text-decoration: underline;">ambystomatechnologies@gmail.com</a> · 100% procesamiento local en el navegador · Privado y seguro.</p>
+    </div>
+  </footer>
+
+  <!-- Scripts de la Aplicación -->
+  <script src="js/pronunciation.js"></script>
+  <script src="js/file-extractors.js"></script>
+  <script src="js/tts-engine.js"></script>
+  <script src="js/audio-export.js"></script>
+  <script src="js/transcriber.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
