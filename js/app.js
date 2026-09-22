@@ -41,6 +41,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const downloadBtnText = document.getElementById("downloadBtnText");
   const downloadLoadingText = document.getElementById("downloadLoadingText");
   const downloadSubtext = document.getElementById("downloadSubtext");
+  const ttsOutputFilename = document.getElementById("ttsOutputFilename");
+  const ttsOutputFilenameExt = document.getElementById("ttsOutputFilenameExt");
+  let currentLoadedDocName = "";
 
   const progressFill = document.getElementById("progressFill");
   const progressText = document.getElementById("progressText");
@@ -248,6 +251,13 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
 
       fileNameDisplay.textContent = `${file.name} (${Math.round(file.size / 1024)} KB)`;
       fileBadge.style.display = "flex";
+
+      // Asignar el nombre base del documento cargado como nombre predeterminado del audio
+      const baseName = file.name.replace(/\.[^/.]+$/, "");
+      currentLoadedDocName = baseName;
+      if (ttsOutputFilename && baseName) {
+        ttsOutputFilename.value = baseName;
+      }
 
       statusText.textContent = "Archivo cargado correctamente.";
       showToast(`Archivo "${file.name}" cargado con éxito.`, "success");
@@ -705,6 +715,15 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
     setDownloadLoading(true, "Sintetizando voz neural y preparando descarga... por favor espera");
     showToast("Sintetizando archivo de audio neural...", "info");
 
+    // Obtener nombre personalizado o derivado del documento cargado
+    let customBaseName = ttsOutputFilename ? ttsOutputFilename.value.trim() : "";
+    if (!customBaseName) {
+      customBaseName = currentLoadedDocName || "audio_sintetizado";
+    }
+    customBaseName = customBaseName.replace(/[/\\?%*:|"<>]/g, "_");
+    const mp3Filename = customBaseName.toLowerCase().endsWith(".mp3") ? customBaseName : `${customBaseName}.mp3`;
+    const wavFilename = customBaseName.toLowerCase().endsWith(".wav") ? customBaseName : `${customBaseName}.wav`;
+
     try {
       // 1. Si el servidor local Python de edge-tts está activo, descargar MP3 neural de alta fidelidad
       if (ttsEngine.useNeuralServer) {
@@ -718,7 +737,8 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
               voice: voiceVal,
               rate: rateVal,
               pitch: pitchVal,
-              volume: 1.0
+              volume: 1.0,
+              filename: mp3Filename
             })
           });
 
@@ -731,7 +751,7 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
           const a = document.createElement("a");
           a.style.display = "none";
           a.href = url;
-          a.download = `audio_${voiceVal}_ambystoma.mp3`;
+          a.download = mp3Filename;
           document.body.appendChild(a);
           a.click();
           setTimeout(() => {
@@ -739,7 +759,7 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
             URL.revokeObjectURL(url);
           }, 1000);
 
-          showToast(`✓ Archivo neural "audio_${voiceVal}_ambystoma.mp3" descargado exitosamente.`, "success");
+          showToast(`✓ Archivo neural "${mp3Filename}" descargado exitosamente.`, "success");
           return;
         } catch (err) {
           console.warn("Error en /api/download, usando fallback:", err);
@@ -756,9 +776,9 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
           locale: localeVal,
           pronManager: pronManager
         },
-        "audio_lector_ambystoma.wav"
+        wavFilename
       );
-      showToast("✓ Archivo 'audio_lector_ambystoma.wav' descargado exitosamente.", "success");
+      showToast(`✓ Archivo "${wavFilename}" descargado exitosamente.`, "success");
     } catch (err) {
       console.error("Error al exportar audio:", err);
       showToast("Error al exportar el archivo de audio: " + err.message, "error");
@@ -957,8 +977,10 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
 
   const audioFileInput = document.getElementById("audioFileInput");
   const audioDropzone = document.getElementById("audioDropzone");
-  const audioFileBadge = document.getElementById("audioFileBadge");
-  const audioFileNameDisplay = document.getElementById("audioFileNameDisplay");
+  const audioFilesListContainer = document.getElementById("audioFilesListContainer");
+  const audioFilesCountBadge = document.getElementById("audioFilesCountBadge");
+  const btnClearAudioFiles = document.getElementById("btnClearAudioFiles");
+  const audioFilesList = document.getElementById("audioFilesList");
   const audioPlayerWrapper = document.getElementById("audioPlayerWrapper");
   const audioPreviewPlayer = document.getElementById("audioPreviewPlayer");
 
@@ -971,7 +993,7 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
   const fileTranscribeProgressPct = document.getElementById("fileTranscribeProgressPct");
   const fileTranscribeRealProgressBar = document.getElementById("fileTranscribeRealProgressBar");
   const fileTranscribeTimeDisplay = document.getElementById("fileTranscribeTimeDisplay");
-  let currentUploadedAudioFile = null;
+  let uploadedAudioFiles = [];
 
   const btnToggleRecord = document.getElementById("btnToggleRecord");
   const btnRecordText = document.getElementById("btnRecordText");
@@ -1080,7 +1102,7 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
     }
   };
 
-  // Carga de Archivos de Audio (Drag & Drop + Input)
+  // Carga de Múltiples Archivos de Audio (Drag & Drop + Input)
   audioDropzone.addEventListener("click", () => audioFileInput.click());
 
   audioDropzone.addEventListener("dragover", (e) => {
@@ -1096,13 +1118,14 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
     e.preventDefault();
     audioDropzone.classList.remove("dragover");
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleAudioFile(e.dataTransfer.files[0]);
+      handleAudioFiles(Array.from(e.dataTransfer.files));
     }
   });
 
   audioFileInput.addEventListener("change", (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      handleAudioFile(e.target.files[0]);
+      handleAudioFiles(Array.from(e.target.files));
+      audioFileInput.value = "";
     }
   });
 
@@ -1113,53 +1136,134 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
     return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   }
 
-  function handleAudioFile(file) {
-    if (!file.type.startsWith("audio/") && !file.name.match(/\.(mp3|wav|m4a|ogg|flac|webm|aac)$/i)) {
-      showToast("Por favor selecciona un archivo de audio válido.", "error");
+  function handleAudioFiles(files) {
+    const validFiles = files.filter(f => 
+      f.type.startsWith("audio/") || f.name.match(/\.(mp3|wav|m4a|ogg|flac|webm|aac)$/i)
+    );
+
+    if (validFiles.length === 0) {
+      showToast("Por favor selecciona archivos de audio válidos (.mp3, .wav, .m4a, .ogg, .flac).", "error");
       return;
     }
 
-    currentUploadedAudioFile = file;
-    const audioUrl = URL.createObjectURL(file);
-    audioPreviewPlayer.src = audioUrl;
-    audioPlayerWrapper.style.display = "block";
-    audioFileNameDisplay.textContent = `${file.name} (${Math.round(file.size / 1024)} KB)`;
-    audioFileBadge.style.display = "flex";
+    let addedCount = 0;
+    validFiles.forEach(vf => {
+      // Evitar duplicados exactos (mismo nombre y tamaño)
+      if (!uploadedAudioFiles.some(f => f.name === vf.name && f.size === vf.size)) {
+        uploadedAudioFiles.push(vf);
+        addedCount++;
+      }
+    });
 
-    // Mostrar el contenedor y botón para proceder con la transcripción
-    if (fileTranscribeActionWrapper) {
-      fileTranscribeActionWrapper.style.display = "block";
-      if (btnTranscribeFile) {
-        btnTranscribeFile.disabled = false;
-      }
-      if (fileTranscribeLoadingBox) {
-        fileTranscribeLoadingBox.style.display = "none";
-      }
+    renderAudioFilesList();
+
+    if (addedCount > 0) {
+      showToast(`${addedCount} ${addedCount === 1 ? 'audio añadido' : 'audios añadidos'}. Total en cola: ${uploadedAudioFiles.length}.`, "info");
     }
-
-    showToast(`Audio "${file.name}" cargado. Haz clic en "Proceder a Transcribir Archivo" para iniciar.`, "info");
   }
 
-  // Listener para el botón de Proceder a Transcribir Archivo de Audio
+  function renderAudioFilesList() {
+    if (!audioFilesList || !audioFilesListContainer) return;
+    audioFilesList.innerHTML = "";
+
+    const total = uploadedAudioFiles.length;
+    if (total === 0) {
+      audioFilesListContainer.style.display = "none";
+      if (audioPlayerWrapper) audioPlayerWrapper.style.display = "none";
+      if (fileTranscribeActionWrapper) fileTranscribeActionWrapper.style.display = "none";
+      return;
+    }
+
+    audioFilesListContainer.style.display = "block";
+    if (fileTranscribeActionWrapper) {
+      fileTranscribeActionWrapper.style.display = "block";
+      if (btnTranscribeFile) btnTranscribeFile.disabled = false;
+      if (fileTranscribeLoadingBox) fileTranscribeLoadingBox.style.display = "none";
+    }
+
+    if (audioFilesCountBadge) {
+      const totalBytes = uploadedAudioFiles.reduce((acc, f) => acc + f.size, 0);
+      const mb = (totalBytes / (1024 * 1024)).toFixed(1);
+      audioFilesCountBadge.textContent = `${total} ${total === 1 ? 'archivo de audio listo' : 'archivos de audio listos'} (${mb} MB)`;
+    }
+
+    if (btnTranscribeFileText) {
+      btnTranscribeFileText.textContent = total > 1
+        ? `Proceder a Transcribir ${total} Archivos de Audio`
+        : "Proceder a Transcribir Archivo";
+    }
+
+    uploadedAudioFiles.forEach((file, idx) => {
+      const item = document.createElement("div");
+      item.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(244, 63, 94, 0.25); border-radius: 6px; padding: 0.4rem 0.65rem; font-size: 0.82rem;";
+
+      const info = document.createElement("div");
+      info.style.cssText = "display: flex; align-items: center; gap: 0.45rem; min-width: 0; flex: 1; cursor: pointer;";
+      info.title = `Clic para escuchar "${file.name}"`;
+      info.innerHTML = `
+        <span style="color: #fb7185;">🎵</span>
+        <span style="font-weight: 600; color: #f8fafc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(file.name)}</span>
+        <span style="color: #94a3b8; font-size: 0.72rem; flex-shrink: 0;">(${Math.round(file.size / 1024)} KB)</span>
+      `;
+      info.addEventListener("click", () => {
+        if (audioPreviewPlayer && audioPlayerWrapper) {
+          audioPreviewPlayer.src = URL.createObjectURL(file);
+          audioPlayerWrapper.style.display = "block";
+          audioPreviewPlayer.play().catch(() => {});
+        }
+      });
+
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.style.cssText = "background: none; border: none; color: #ef4444; font-size: 0.85rem; cursor: pointer; padding: 0.1rem 0.35rem; border-radius: 4px;";
+      delBtn.title = "Quitar este archivo";
+      delBtn.innerHTML = "✕";
+      delBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        uploadedAudioFiles.splice(idx, 1);
+        renderAudioFilesList();
+      });
+
+      item.appendChild(info);
+      item.appendChild(delBtn);
+      audioFilesList.appendChild(item);
+    });
+
+    // Cargar el primer audio en el reproductor si está disponible
+    if (uploadedAudioFiles.length > 0 && audioPreviewPlayer && audioPlayerWrapper) {
+      audioPreviewPlayer.src = URL.createObjectURL(uploadedAudioFiles[0]);
+      audioPlayerWrapper.style.display = "block";
+    }
+  }
+
+  if (btnClearAudioFiles) {
+    btnClearAudioFiles.addEventListener("click", () => {
+      uploadedAudioFiles = [];
+      renderAudioFilesList();
+      showToast("Lista de audios vaciada.", "info");
+    });
+  }
+
+  // Listener para el botón de Proceder a Transcribir Múltiples Archivos de Audio
   if (btnTranscribeFile) {
     btnTranscribeFile.addEventListener("click", async () => {
-      if (!currentUploadedAudioFile) {
-        showToast("Por favor selecciona o arrastra primero un archivo de audio para transcribir.", "info");
+      if (!uploadedAudioFiles || uploadedAudioFiles.length === 0) {
+        showToast("Por favor selecciona o arrastra al menos un archivo de audio para transcribir.", "info");
         if (audioFileInput) audioFileInput.click();
         return;
       }
 
-      // Preparar estado de carga visual y resetear barra de progreso real
+      const totalFiles = uploadedAudioFiles.length;
+
       btnTranscribeFile.disabled = true;
       if (btnTranscribeFileIcon) btnTranscribeFileIcon.textContent = "⏳";
-      if (btnTranscribeFileText) btnTranscribeFileText.textContent = "Transcribiendo audio...";
+      if (btnTranscribeFileText) btnTranscribeFileText.textContent = totalFiles > 1 ? `Transcribiendo (0/${totalFiles})...` : "Transcribiendo audio...";
       if (fileTranscribeLoadingBox) fileTranscribeLoadingBox.style.display = "block";
-      if (fileTranscribeLoadingText) fileTranscribeLoadingText.textContent = "Iniciando transcripción con Inteligencia Artificial...";
       if (fileTranscribeProgressPct) fileTranscribeProgressPct.textContent = "0%";
       if (fileTranscribeRealProgressBar) fileTranscribeRealProgressBar.style.width = "0%";
       if (fileTranscribeTimeDisplay) fileTranscribeTimeDisplay.textContent = "Tiempo: 00:00 / 00:00";
       
-      // Limpiar el área de texto para que el usuario vea el texto aparecer en tiempo real
+      // Limpiar el área de texto para ver la transcripción en vivo
       if (transcriptionOutput) transcriptionOutput.value = "";
       if (transcribeWordCount) transcribeWordCount.textContent = "0 palabras";
 
@@ -1167,136 +1271,190 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
       const diarize = chkDifferentiateSpeakers ? (chkDifferentiateSpeakers.checked ? "1" : "0") : "1";
       const timestamps = chkIncludeTimestamps ? (chkIncludeTimestamps.checked ? "1" : "0") : "1";
 
-      try {
-        const query = new URLSearchParams({
-          lang: lang,
-          diarize: diarize,
-          timestamps: timestamps,
-          filename: currentUploadedAudioFile.name
-        });
+      let accumulatedTranscripts = [];
 
-        const res = await fetch(`/api/transcribe?${query.toString()}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": currentUploadedAudioFile.type || "application/octet-stream",
-            "X-Language": lang,
-            "X-Diarize": diarize,
-            "X-Timestamps": timestamps,
-            "X-Filename": encodeURIComponent(currentUploadedAudioFile.name)
-          },
-          body: currentUploadedAudioFile
-        });
+      // Procesar archivo por archivo en cola secuencial para no saturar memoria RAM
+      for (let i = 0; i < totalFiles; i++) {
+        const file = uploadedAudioFiles[i];
+        const fileHeaderTitle = totalFiles > 1 
+          ? `════════════════════════════════════════\n📄 Transcripción: ${file.name}\n════════════════════════════════════════\n\n`
+          : "";
 
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || `Error del servidor (${res.status})`);
+        if (fileTranscribeLoadingText) {
+          fileTranscribeLoadingText.textContent = totalFiles > 1 
+            ? `Transcribiendo ${i + 1}/${totalFiles}: "${file.name}"...`
+            : `Transcribiendo "${file.name}" con Whisper IA...`;
         }
 
-        // Leer el flujo de eventos en tiempo real (Server-Sent Events)
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-        let buffer = "";
+        try {
+          const query = new URLSearchParams({
+            lang: lang,
+            diarize: diarize,
+            timestamps: timestamps,
+            filename: file.name
+          });
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+          const res = await fetch(`/api/transcribe?${query.toString()}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": file.type || "application/octet-stream",
+              "X-Language": lang,
+              "X-Diarize": diarize,
+              "X-Timestamps": timestamps,
+              "X-Filename": encodeURIComponent(file.name)
+            },
+            body: file
+          });
 
-          buffer += decoder.decode(value, { stream: true });
-          const messages = buffer.split("\n\n");
-          buffer = messages.pop() || "";
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `Error del servidor (${res.status})`);
+          }
 
-          for (const msg of messages) {
-            const trimmed = msg.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            const jsonStr = trimmed.replace(/^data:\s*/, "");
-            try {
-              const event = JSON.parse(jsonStr);
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder("utf-8");
+          let buffer = "";
+          let currentFileText = "";
 
-              if (event.type === "status") {
-                if (fileTranscribeLoadingText && event.message) {
-                  fileTranscribeLoadingText.textContent = event.message;
-                }
-                if (event.progress !== undefined) {
-                  const pct = Math.min(100, Math.max(0, event.progress));
-                  if (fileTranscribeRealProgressBar) fileTranscribeRealProgressBar.style.width = `${pct}%`;
-                  if (fileTranscribeProgressPct) fileTranscribeProgressPct.textContent = `${pct}%`;
-                }
-                if (event.current_time && event.total_time && fileTranscribeTimeDisplay) {
-                  fileTranscribeTimeDisplay.textContent = `Tiempo: ${event.current_time} / ${event.total_time}`;
-                }
-              } else if (event.type === "segment") {
-                // Actualizar barra y progreso real
-                if (event.progress !== undefined) {
-                  const pct = Math.min(99, Math.max(0, event.progress));
-                  if (fileTranscribeRealProgressBar) fileTranscribeRealProgressBar.style.width = `${pct}%`;
-                  if (fileTranscribeProgressPct) fileTranscribeProgressPct.textContent = `${pct}%`;
-                }
-                if (event.current_time && event.total_time && fileTranscribeTimeDisplay) {
-                  fileTranscribeTimeDisplay.textContent = `Tiempo: ${event.current_time} / ${event.total_time}`;
-                }
-                if (fileTranscribeLoadingText) {
-                  fileTranscribeLoadingText.textContent = "Transcribiendo en vivo con Whisper IA...";
-                }
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-                // El texto aparece al instante al lado conforme transcribe
-                if (transcriptionOutput && event.full_text !== undefined) {
-                  transcriptionOutput.value = event.full_text;
-                  transcriptionOutput.scrollTop = transcriptionOutput.scrollHeight;
+            buffer += decoder.decode(value, { stream: true });
+            const messages = buffer.split("\n\n");
+            buffer = messages.pop() || "";
+
+            for (const msg of messages) {
+              const trimmed = msg.trim();
+              if (!trimmed.startsWith("data:")) continue;
+              const jsonStr = trimmed.replace(/^data:\s*/, "");
+              try {
+                const event = JSON.parse(jsonStr);
+
+                if (event.type === "status") {
+                  if (fileTranscribeLoadingText && event.message) {
+                    const prefix = totalFiles > 1 ? `[${i + 1}/${totalFiles}] ` : "";
+                    fileTranscribeLoadingText.textContent = `${prefix}${event.message}`;
+                  }
+                  if (event.current_time && event.total_time && fileTranscribeTimeDisplay) {
+                    fileTranscribeTimeDisplay.textContent = `Tiempo: ${event.current_time} / ${event.total_time}`;
+                  }
+                } else if (event.type === "segment") {
+                  currentFileText = event.full_text || currentFileText;
+
+                  // Progreso global acumulativo
+                  const fileProgress = Math.min(99, Math.max(0, event.progress || 0));
+                  const globalPct = Math.round(((i + (fileProgress / 100)) / totalFiles) * 100);
+                  if (fileTranscribeRealProgressBar) fileTranscribeRealProgressBar.style.width = `${globalPct}%`;
+                  if (fileTranscribeProgressPct) fileTranscribeProgressPct.textContent = `${globalPct}%`;
+
+                  if (event.current_time && event.total_time && fileTranscribeTimeDisplay) {
+                    fileTranscribeTimeDisplay.textContent = `Tiempo: ${event.current_time} / ${event.total_time}`;
+                  }
+
+                  // Mostrar texto acumulado de los archivos completados + el archivo en curso
+                  let livePreview = "";
+                  if (accumulatedTranscripts.length > 0) {
+                    livePreview = accumulatedTranscripts.join("\n\n\n") + "\n\n\n";
+                  }
+                  livePreview += fileHeaderTitle + currentFileText;
+
+                  if (transcriptionOutput) {
+                    transcriptionOutput.value = livePreview;
+                    transcriptionOutput.scrollTop = transcriptionOutput.scrollHeight;
+                  }
+                  if (transcribeWordCount) {
+                    const words = livePreview.trim() ? livePreview.trim().split(/\s+/).length : 0;
+                    transcribeWordCount.textContent = `${words.toLocaleString()} palabras`;
+                  }
+                } else if (event.type === "done") {
+                  currentFileText = event.full_text || currentFileText;
+                } else if (event.type === "error") {
+                  throw new Error(event.error || "Error durante la transcripción");
                 }
-                if (transcribeWordCount && event.word_count !== undefined) {
-                  transcribeWordCount.textContent = `${event.word_count.toLocaleString()} palabras`;
-                }
-              } else if (event.type === "done") {
-                // Completado al 100%
-                if (fileTranscribeRealProgressBar) fileTranscribeRealProgressBar.style.width = "100%";
-                if (fileTranscribeProgressPct) fileTranscribeProgressPct.textContent = "100%";
-                if (fileTranscribeLoadingText) fileTranscribeLoadingText.textContent = "¡Transcripción completada con éxito!";
-                if (transcriptionOutput && event.full_text) {
-                  transcriptionOutput.value = event.full_text;
-                  transcriptionOutput.scrollTop = transcriptionOutput.scrollHeight;
-                }
-                if (transcribeWordCount && event.word_count !== undefined) {
-                  transcribeWordCount.textContent = `${event.word_count.toLocaleString()} palabras`;
-                }
-                if (Array.isArray(event.segments) && event.segments.length > 0) {
-                  transcriber.transcriptionEntries = event.segments.map(s => ({
-                    time: formatSecondsToMMSS(s.start),
-                    seconds: Math.round(s.start),
-                    speaker: s.speaker && s.speaker.includes("2") ? 2 : 1,
-                    text: s.text
-                  }));
-                }
-                showToast("¡Transcripción completada con éxito!", "success");
-              } else if (event.type === "error") {
-                throw new Error(event.error || "Error durante la transcripción");
+              } catch (parseErr) {
+                console.warn("Aviso parseando chunk de transcripción:", parseErr);
               }
-            } catch (parseErr) {
-              console.warn("Aviso parseando chunk de transcripción:", parseErr);
             }
           }
+
+          // Guardar el bloque completado de este archivo
+          const finalFileBlock = fileHeaderTitle + (currentFileText.trim() || "[Sin audio o voz detectable en este archivo]");
+          accumulatedTranscripts.push(finalFileBlock);
+
+          // Actualizar barra al terminar este archivo
+          const completedPct = Math.round(((i + 1) / totalFiles) * 100);
+          if (fileTranscribeRealProgressBar) fileTranscribeRealProgressBar.style.width = `${completedPct}%`;
+          if (fileTranscribeProgressPct) fileTranscribeProgressPct.textContent = `${completedPct}%`;
+
+        } catch (err) {
+          console.warn(`Error transcribiendo ${file.name}:`, err);
+          const errBlock = fileHeaderTitle + `[Error al procesar este archivo: ${err.message}]`;
+          accumulatedTranscripts.push(errBlock);
+          showToast(`Error en "${file.name}": ${err.message}`, "error");
         }
-      } catch (err) {
-        console.warn("Fallo en transcripción en tiempo real:", err);
-        showToast(`No se pudo completar la transcripción: ${err.message}`, "error");
-      } finally {
-        btnTranscribeFile.disabled = false;
-        if (btnTranscribeFileIcon) btnTranscribeFileIcon.textContent = "⚡";
-        if (btnTranscribeFileText) btnTranscribeFileText.textContent = "Proceder a Transcribir Archivo";
-        // Mantener visible la barra al 100% durante 4 segundos para confirmación visual
-        setTimeout(() => {
-          if (fileTranscribeLoadingBox && !btnTranscribeFile.disabled) {
-            fileTranscribeLoadingBox.style.display = "none";
-          }
-        }, 4000);
       }
+
+      // Consolidar todos los textos en el área de salida
+      const fullCombinedText = accumulatedTranscripts.join("\n\n\n");
+      if (transcriptionOutput) {
+        transcriptionOutput.value = fullCombinedText;
+        transcriptionOutput.scrollTop = transcriptionOutput.scrollHeight;
+      }
+      if (transcribeWordCount) {
+        const words = fullCombinedText.trim() ? fullCombinedText.trim().split(/\s+/).length : 0;
+        transcribeWordCount.textContent = `${words.toLocaleString()} palabras`;
+      }
+
+      if (fileTranscribeRealProgressBar) fileTranscribeRealProgressBar.style.width = "100%";
+      if (fileTranscribeProgressPct) fileTranscribeProgressPct.textContent = "100%";
+      if (fileTranscribeLoadingText) fileTranscribeLoadingText.textContent = `¡Transcripción de ${totalFiles} ${totalFiles === 1 ? 'archivo' : 'archivos'} completada con éxito!`;
+
+      showToast(`¡Transcripción completada de ${totalFiles} ${totalFiles === 1 ? 'archivo' : 'archivos'}!`, "success", 5000);
+
+      btnTranscribeFile.disabled = false;
+      if (btnTranscribeFileIcon) btnTranscribeFileIcon.textContent = "⚡";
+      if (btnTranscribeFileText) btnTranscribeFileText.textContent = totalFiles > 1 ? `Proceder a Transcribir ${totalFiles} Archivos` : "Proceder a Transcribir Archivo";
+
+      setTimeout(() => {
+        if (fileTranscribeLoadingBox && !btnTranscribeFile.disabled) {
+          fileTranscribeLoadingBox.style.display = "none";
+        }
+      }, 5000);
     });
   }
 
-  // Exportar a .TXT
+  // Exportar a .TXT (Descarga todos los textos sumados como un solo archivo)
   btnExportTxt.addEventListener("click", () => {
     try {
-      transcriber.exportToTxt();
-      showToast("Transcripción guardada en archivo .txt.", "success");
+      const text = transcriptionOutput ? transcriptionOutput.value : "";
+      if (!text.trim()) {
+        showToast("No hay texto transcrito para guardar.", "info");
+        return;
+      }
+
+      let filename = "transcripcion_audio.txt";
+      if (uploadedAudioFiles && uploadedAudioFiles.length === 1) {
+        const base = uploadedAudioFiles[0].name.replace(/\.[^/.]+$/, "");
+        filename = `${base}_transcripcion.txt`;
+      } else if (uploadedAudioFiles && uploadedAudioFiles.length > 1) {
+        filename = `transcripcion_combinada_${uploadedAudioFiles.length}_audios.txt`;
+      }
+
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.style.display = "none";
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 1000);
+
+      showToast(`Transcripción guardada como "${filename}".`, "success");
     } catch (err) {
       showToast(err.message, "error");
     }

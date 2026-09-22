@@ -625,8 +625,10 @@ class NeuralTTSHandler(SimpleHTTPRequestHandler):
                 audio_bytes = asyncio.run(synthesize_edge_tts(processed_text, voice, rate, pitch, volume))
                 self.send_response(HTTPStatus.OK)
                 self.send_header("Content-Type", "audio/mpeg")
-                self.send_header("Content-Length", str(len(audio_bytes)))
-                self.send_header("Content-Disposition", 'attachment; filename="audio_lector_ambystoma.mp3"')
+                download_filename = data.get("filename") or "audio_lector_ambystoma.mp3"
+                if not download_filename.lower().endswith(".mp3"):
+                    download_filename += ".mp3"
+                self.send_header("Content-Disposition", f'attachment; filename="{download_filename}"')
                 self._set_cors_headers()
                 self.end_headers()
                 self.wfile.write(audio_bytes)

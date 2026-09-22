@@ -386,9 +386,21 @@
             </div>
           </div>
 
-          <!-- Botón para Descargar Audio con Indicador de Carga -->
-          <div class="card" style="text-align: center;">
-            <button id="btnDownloadAudio" class="btn btn-accent" style="width: 100%;">
+          <!-- Botón para Descargar Audio con Campo para Cambiar Nombre e Indicador de Carga -->
+          <div class="card" style="text-align: left;">
+            <!-- Campo para Elegir o Modificar el Nombre del Audio -->
+            <div class="form-group" style="margin-bottom: 0.85rem;">
+              <label for="ttsOutputFilename" class="form-label" style="font-size: 0.84rem; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
+                <span style="display: flex; align-items: center; gap: 0.35rem;">🏷️ <span>Nombre del archivo de audio:</span></span>
+                <small style="color: var(--text-muted); font-size: 0.72rem;">(Editable antes de descargar)</small>
+              </label>
+              <div style="display: flex; align-items: center; background: rgba(15, 23, 42, 0.65); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); overflow: hidden; width: 100%;">
+                <input type="text" id="ttsOutputFilename" value="audio_sintetizado" placeholder="nombre_del_audio" style="flex: 1; padding: 0.65rem 0.85rem; background: transparent; border: none; color: #f8fafc; font-size: 0.92rem; outline: none; font-family: inherit;">
+                <span id="ttsOutputFilenameExt" style="padding: 0 0.85rem; color: #38bdf8; font-size: 0.85rem; font-weight: 700; background: rgba(255, 255, 255, 0.05); user-select: none;">.mp3</span>
+              </div>
+            </div>
+
+            <button id="btnDownloadAudio" class="btn btn-accent" style="width: 100%; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.25rem;">
               <span id="downloadBtnIcon">💾</span> <span id="downloadBtnText">Descargar Archivo de Audio</span>
             </button>
 
@@ -405,7 +417,7 @@
               </div>
             </div>
 
-            <small id="downloadSubtext" style="display: block; margin-top: 0.45rem; color: var(--text-muted); font-size: 0.72rem;">
+            <small id="downloadSubtext" style="display: block; margin-top: 0.45rem; color: var(--text-muted); font-size: 0.72rem; text-align: center;">
               Guarda el audio sintetizado (.mp3 / .wav) con los ajustes y pronunciación actual
             </small>
           </div>
@@ -452,33 +464,44 @@
               </div>
             </div>
 
-            <!-- Dropzone para Archivos de Audio -->
+            <!-- Dropzone para Múltiples Archivos de Audio -->
             <div class="dropzone" id="audioDropzone" style="border-color: rgba(244, 63, 94, 0.35);">
-              <input type="file" id="audioFileInput" accept=".mp3,.wav,.m4a,.ogg,.flac,.webm,.aac,audio/*" style="display: none;">
+              <input type="file" id="audioFileInput" multiple accept=".mp3,.wav,.m4a,.ogg,.flac,.webm,.aac,audio/*" style="display: none;">
               <div class="dropzone-icon" style="color: #fb7185;">🎙️</div>
               <div class="dropzone-text">
-                <strong>Arrastra tu archivo de audio aquí</strong> o haz clic para examinar
+                <strong>Arrastra tus archivos de audio aquí</strong> o haz clic para examinar
               </div>
               <div class="dropzone-formats">
-                MP3 · WAV · M4A · OGG · FLAC · Grabaciones de voz
+                MP3 · WAV · M4A · OGG · FLAC · AAC (Sube múltiples archivos simultáneamente)
               </div>
             </div>
 
-            <!-- Badge y Reproductor de Audio Embebido -->
-            <div id="audioFileBadge" class="file-info-badge" style="display: none; margin-top: 0.75rem; background: rgba(244, 63, 94, 0.15); border-color: rgba(244, 63, 94, 0.35); color: #fb7185;">
-              <span>🎵</span>
-              <span id="audioFileNameDisplay" style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+            <!-- Lista Dinámica de Archivos de Audio Cargados -->
+            <div id="audioFilesListContainer" style="display: none; margin-top: 0.85rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.45rem; padding: 0 0.2rem;">
+                <span id="audioFilesCountBadge" style="font-size: 0.82rem; font-weight: 700; color: #fb7185;">
+                  0 archivos seleccionados
+                </span>
+                <button type="button" id="btnClearAudioFiles" class="btn btn-glass btn-sm" style="font-size: 0.72rem; padding: 0.2rem 0.55rem; color: #94a3b8;" title="Quitar todos los audios">
+                  Vaciar lista
+                </button>
+              </div>
+              <div id="audioFilesList" style="max-height: 190px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; padding-right: 2px;">
+                <!-- Elementos generados dinámicamente con JS -->
+              </div>
             </div>
 
+            <!-- Reproductor de Audio Opcional -->
             <div id="audioPlayerWrapper" class="audio-player-container" style="display: none; margin-top: 0.75rem;">
+              <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.3rem;">Reproductor previo:</div>
               <audio id="audioPreviewPlayer" controls style="width: 100%;"></audio>
             </div>
 
-            <!-- Botón para Proceder a Transcribir el Archivo de Audio Cargado -->
-            <div id="fileTranscribeActionWrapper" style="margin-top: 1rem;">
+            <!-- Botón para Proceder a Transcribir los Archivos de Audio Cargados -->
+            <div id="fileTranscribeActionWrapper" style="display: none; margin-top: 1rem;">
               <button id="btnTranscribeFile" class="btn btn-primary" style="width: 100%; justify-content: center; gap: 0.5rem; padding: 0.8rem 1.2rem; font-size: 0.95rem; font-weight: 600; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);">
                 <span id="btnTranscribeFileIcon">⚡</span>
-                <span id="btnTranscribeFileText">Proceder a Transcribir Archivo</span>
+                <span id="btnTranscribeFileText">Proceder a Transcribir Archivos</span>
               </button>
 
               <!-- Indicador de Carga y Progreso REAL de la Transcripción -->
