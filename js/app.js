@@ -1532,6 +1532,15 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
     }
   });
 
+  // Redirección infalible al sitio oficial Ambystoma Technologies
+  document.querySelectorAll('.header-logo-container, .header-brand-logo, .brand-wrapper, .brand-icon-box, .brand-info').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.location.href = 'https://ambystomatechnologies.github.io/';
+    });
+  });
+
   // Inicialización de estado inicial
   updateTextStats();
   updateDictBadge();
