@@ -384,12 +384,14 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
         voiceModeBadge.style.color = "#4ade80";
         voiceModeDot.style.background = "#22c55e";
         voiceModeText.innerHTML = `<strong>Servidor Local Activo</strong> · 45 Voces Neurales de Alta Calidad`;
+        if (ttsOutputFilenameExt) ttsOutputFilenameExt.textContent = ".mp3";
       } else {
         voiceModeBadge.style.background = "rgba(56, 189, 248, 0.08)";
         voiceModeBadge.style.borderColor = "rgba(56, 189, 248, 0.2)";
         voiceModeBadge.style.color = "#94a3b8";
         voiceModeDot.style.background = "#38bdf8";
-        voiceModeText.innerHTML = `<strong>Modo Web</strong> · Usando voces disponibles en tu navegador`;
+        voiceModeText.innerHTML = `<strong>Modo Web Online</strong> · Usando voces disponibles en tu navegador`;
+        if (ttsOutputFilenameExt) ttsOutputFilenameExt.textContent = ".wav";
       }
     }
 
@@ -974,6 +976,63 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
   // 9. Controlador del Módulo de Transcripción de Audio
   // =========================================================================
   const transcriber = new window.AudioTranscriber();
+  const browserWhisper = window.BrowserWhisperTranscriber ? new window.BrowserWhisperTranscriber() : null;
+  let lastTranscribedFileSegments = [];
+
+  function formatSingleFileSegments(segments, diarizeBool, timestampsBool) {
+    if (!segments || segments.length === 0) return "";
+    if (!diarizeBool) {
+      return segments
+        .map((seg) => {
+          const tsStr = timestampsBool ? `[${formatSecondsToMMSS(seg.start)}] ` : "";
+          return `${tsStr}${seg.text}`;
+        })
+        .join("\n\n");
+    }
+
+    const blocks = [];
+    let currentSpeaker = null;
+    let currentTexts = [];
+    let currentStartTime = 0;
+
+    for (const seg of segments) {
+      const spk = seg.speaker || "Hablante 1";
+      const tStart = seg.start || 0;
+      if (spk !== currentSpeaker) {
+        if (currentSpeaker !== null && currentTexts.length > 0) {
+          const tsStr = timestampsBool ? `[${formatSecondsToMMSS(currentStartTime)}] ` : "";
+          blocks.push(`${tsStr}${currentSpeaker}: ${currentTexts.join(" ")}`);
+          currentTexts = [];
+        }
+        currentSpeaker = spk;
+        currentStartTime = tStart;
+      }
+      currentTexts.push(seg.text);
+    }
+
+    if (currentSpeaker !== null && currentTexts.length > 0) {
+      const tsStr = timestampsBool ? `[${formatSecondsToMMSS(currentStartTime)}] ` : "";
+      blocks.push(`${tsStr}${currentSpeaker}: ${currentTexts.join(" ")}`);
+    }
+
+    return blocks.join("\n\n");
+  }
+
+  function refreshTranscriptionViewFromOptions() {
+    if (lastTranscribedFileSegments.length > 0) {
+      const diarizeBool = chkDifferentiateSpeakers ? chkDifferentiateSpeakers.checked : true;
+      const timestampsBool = chkIncludeTimestamps ? chkIncludeTimestamps.checked : true;
+      const parts = lastTranscribedFileSegments
+        .map((segs) => formatSingleFileSegments(segs, diarizeBool, timestampsBool))
+        .filter((t) => t.trim().length > 0);
+      const combined = parts.join("\n\n");
+      transcriptionOutput.value = combined;
+      const words = combined.trim() ? combined.trim().split(/\s+/).length : 0;
+      transcribeWordCount.textContent = `${words.toLocaleString()} palabras`;
+    } else if (transcriber.transcriptionEntries.length > 0) {
+      transcriptionOutput.value = transcriber.getFormattedText();
+    }
+  }
 
   const audioFileInput = document.getElementById("audioFileInput");
   const audioDropzone = document.getElementById("audioDropzone");
@@ -1026,12 +1085,12 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
 
   chkDifferentiateSpeakers.addEventListener("change", (e) => {
     transcriber.differentiateSpeakers = e.target.checked;
-    transcriptionOutput.value = transcriber.getFormattedText();
+    refreshTranscriptionViewFromOptions();
   });
 
   chkIncludeTimestamps.addEventListener("change", (e) => {
     transcriber.includeTimestamps = e.target.checked;
-    transcriptionOutput.value = transcriber.getFormattedText();
+    refreshTranscriptionViewFromOptions();
   });
 
   // Selector de Hablante Activo
@@ -1276,10 +1335,13 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
       if (transcribeWordCount) transcribeWordCount.textContent = "0 palabras";
 
       const lang = transcribeLangSelect ? transcribeLangSelect.value : "es-CR";
-      const diarize = chkDifferentiateSpeakers ? (chkDifferentiateSpeakers.checked ? "1" : "0") : "1";
-      const timestamps = chkIncludeTimestamps ? (chkIncludeTimestamps.checked ? "1" : "0") : "1";
+      const diarizeBool = chkDifferentiateSpeakers ? chkDifferentiateSpeakers.checked : true;
+      const timestampsBool = chkIncludeTimestamps ? chkIncludeTimestamps.checked : true;
+      const diarize = diarizeBool ? "1" : "0";
+      const timestamps = timestampsBool ? "1" : "0";
 
       let accumulatedTranscripts = [];
+      lastTranscribedFileSegments = [];
 
       // Procesar archivo por archivo en cola secuencial para no saturar memoria RAM
       for (let i = 0; i < totalFiles; i++) {
@@ -1291,126 +1353,167 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
             : `Transcribiendo "${file.name}" con Whisper IA...`;
         }
 
-        try {
-          const query = new URLSearchParams({
-            lang: lang,
-            diarize: diarize,
-            timestamps: timestamps,
-            filename: file.name
-          });
+        let currentFileText = "";
+        let currentFileSegments = [];
 
-          const res = await fetch(`/api/transcribe?${query.toString()}`, {
-            method: "POST",
-            headers: {
-              "Content-Type": file.type || "application/octet-stream",
-              "X-Language": lang,
-              "X-Diarize": diarize,
-              "X-Timestamps": timestamps,
-              "X-Filename": encodeURIComponent(file.name)
-            },
-            body: file
-          });
+        const handleTranscribeEvent = (event) => {
+          if (!event) return;
+          if (event.type === "status") {
+            if (fileTranscribeLoadingText && event.message) {
+              const prefix = totalFiles > 1 ? `[${i + 1}/${totalFiles}] ` : "";
+              fileTranscribeLoadingText.textContent = `${prefix}${event.message}`;
+            }
+            if (typeof event.progress === "number") {
+              const fileProgress = Math.min(99, Math.max(0, event.progress));
+              const globalPct = Math.round(((i + (fileProgress / 100)) / totalFiles) * 100);
+              if (fileTranscribeRealProgressBar) fileTranscribeRealProgressBar.style.width = `${globalPct}%`;
+              if (fileTranscribeProgressPct) fileTranscribeProgressPct.textContent = `${globalPct}%`;
+            }
+            if (event.current_time && event.total_time && fileTranscribeTimeDisplay) {
+              fileTranscribeTimeDisplay.textContent = `Tiempo: ${event.current_time} / ${event.total_time}`;
+            }
+          } else if (event.type === "segment") {
+            currentFileText = event.full_text || currentFileText;
 
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.error || `Error del servidor (${res.status})`);
+            const fileProgress = Math.min(99, Math.max(0, event.progress || 0));
+            const globalPct = Math.round(((i + (fileProgress / 100)) / totalFiles) * 100);
+            if (fileTranscribeRealProgressBar) fileTranscribeRealProgressBar.style.width = `${globalPct}%`;
+            if (fileTranscribeProgressPct) fileTranscribeProgressPct.textContent = `${globalPct}%`;
+
+            if (event.current_time && event.total_time && fileTranscribeTimeDisplay) {
+              fileTranscribeTimeDisplay.textContent = `Tiempo: ${event.current_time} / ${event.total_time}`;
+            }
+
+            const completedText = accumulatedTranscripts.join("\n\n");
+            let livePreview = completedText;
+            if (currentFileText.trim()) {
+              livePreview = completedText ? (completedText + "\n\n" + currentFileText.trim()) : currentFileText.trim();
+            }
+
+            if (transcriptionOutput) {
+              transcriptionOutput.value = livePreview;
+              transcriptionOutput.scrollTop = transcriptionOutput.scrollHeight;
+            }
+            if (transcribeWordCount) {
+              const words = livePreview.trim() ? livePreview.trim().split(/\s+/).length : 0;
+              transcribeWordCount.textContent = `${words.toLocaleString()} palabras`;
+            }
+          } else if (event.type === "done") {
+            currentFileText = event.full_text || currentFileText;
+            if (Array.isArray(event.segments)) {
+              currentFileSegments = event.segments;
+            }
+
+            const completedText = accumulatedTranscripts.join("\n\n");
+            let livePreview = completedText;
+            if (currentFileText.trim()) {
+              livePreview = completedText ? (completedText + "\n\n" + currentFileText.trim()) : currentFileText.trim();
+            }
+            if (transcriptionOutput) {
+              transcriptionOutput.value = livePreview;
+              transcriptionOutput.scrollTop = transcriptionOutput.scrollHeight;
+            }
+            if (transcribeWordCount) {
+              const words = livePreview.trim() ? livePreview.trim().split(/\s+/).length : 0;
+              transcribeWordCount.textContent = `${words.toLocaleString()} palabras`;
+            }
+          } else if (event.type === "error") {
+            throw new Error(event.error || "Error durante la transcripción");
           }
+        };
 
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder("utf-8");
-          let buffer = "";
-          let currentFileText = "";
+        const runBrowserWhisperFallback = async () => {
+          if (!browserWhisper) {
+            throw new Error("El motor Whisper IA en navegador no está disponible.");
+          }
+          await browserWhisper.transcribeFile(
+            file,
+            {
+              language: lang,
+              diarize: diarizeBool,
+              timestamps: timestampsBool
+            },
+            handleTranscribeEvent
+          );
+        };
 
-          let fileFinished = false;
-          while (!fileFinished) {
-            const { done, value } = await reader.read();
-            if (done) break;
+        try {
+          if (ttsEngine.useNeuralServer) {
+            try {
+              const query = new URLSearchParams({
+                lang: lang,
+                diarize: diarize,
+                timestamps: timestamps,
+                filename: file.name
+              });
 
-            buffer += decoder.decode(value, { stream: true });
-            const messages = buffer.split("\n\n");
-            buffer = messages.pop() || "";
+              const res = await fetch(`/api/transcribe?${query.toString()}`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": file.type || "application/octet-stream",
+                  "X-Language": lang,
+                  "X-Diarize": diarize,
+                  "X-Timestamps": timestamps,
+                  "X-Filename": encodeURIComponent(file.name)
+                },
+                body: file
+              });
 
-            for (const msg of messages) {
-              const trimmed = msg.trim();
-              if (!trimmed.startsWith("data:")) continue;
-              const jsonStr = trimmed.replace(/^data:\s*/, "");
-              try {
-                const event = JSON.parse(jsonStr);
-
-                if (event.type === "status") {
-                  if (fileTranscribeLoadingText && event.message) {
-                    const prefix = totalFiles > 1 ? `[${i + 1}/${totalFiles}] ` : "";
-                    fileTranscribeLoadingText.textContent = `${prefix}${event.message}`;
-                  }
-                  if (event.current_time && event.total_time && fileTranscribeTimeDisplay) {
-                    fileTranscribeTimeDisplay.textContent = `Tiempo: ${event.current_time} / ${event.total_time}`;
-                  }
-                } else if (event.type === "segment") {
-                  currentFileText = event.full_text || currentFileText;
-
-                  // Progreso global acumulativo
-                  const fileProgress = Math.min(99, Math.max(0, event.progress || 0));
-                  const globalPct = Math.round(((i + (fileProgress / 100)) / totalFiles) * 100);
-                  if (fileTranscribeRealProgressBar) fileTranscribeRealProgressBar.style.width = `${globalPct}%`;
-                  if (fileTranscribeProgressPct) fileTranscribeProgressPct.textContent = `${globalPct}%`;
-
-                  if (event.current_time && event.total_time && fileTranscribeTimeDisplay) {
-                    fileTranscribeTimeDisplay.textContent = `Tiempo: ${event.current_time} / ${event.total_time}`;
-                  }
-
-                  // Mostrar texto acumulado de los archivos completados + el archivo en curso (sin nombres de archivo)
-                  const completedText = accumulatedTranscripts.join("\n\n");
-                  let livePreview = completedText;
-                  if (currentFileText.trim()) {
-                    livePreview = completedText ? (completedText + "\n\n" + currentFileText.trim()) : currentFileText.trim();
-                  }
-
-                  if (transcriptionOutput) {
-                    transcriptionOutput.value = livePreview;
-                    transcriptionOutput.scrollTop = transcriptionOutput.scrollHeight;
-                  }
-                  if (transcribeWordCount) {
-                    const words = livePreview.trim() ? livePreview.trim().split(/\s+/).length : 0;
-                    transcribeWordCount.textContent = `${words.toLocaleString()} palabras`;
-                  }
-                } else if (event.type === "done") {
-                  currentFileText = event.full_text || currentFileText;
-
-                  // Actualizar también al llegar evento "done"
-                  const completedText = accumulatedTranscripts.join("\n\n");
-                  let livePreview = completedText;
-                  if (currentFileText.trim()) {
-                    livePreview = completedText ? (completedText + "\n\n" + currentFileText.trim()) : currentFileText.trim();
-                  }
-                  if (transcriptionOutput) {
-                    transcriptionOutput.value = livePreview;
-                    transcriptionOutput.scrollTop = transcriptionOutput.scrollHeight;
-                  }
-                  if (transcribeWordCount) {
-                    const words = livePreview.trim() ? livePreview.trim().split(/\s+/).length : 0;
-                    transcribeWordCount.textContent = `${words.toLocaleString()} palabras`;
-                  }
-                  fileFinished = true;
-                  break;
-                } else if (event.type === "error") {
-                  fileFinished = true;
-                  throw new Error(event.error || "Error durante la transcripción");
-                }
-              } catch (parseErr) {
-                if (fileFinished) throw parseErr;
-                console.warn("Aviso parseando chunk de transcripción:", parseErr);
+              if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || `HTTP ${res.status}`);
               }
-            }
 
-            if (fileFinished) {
-              try { await reader.cancel(); } catch (e) {}
-              break;
+              const reader = res.body.getReader();
+              const decoder = new TextDecoder("utf-8");
+              let buffer = "";
+              let fileFinished = false;
+
+              while (!fileFinished) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const messages = buffer.split("\n\n");
+                buffer = messages.pop() || "";
+
+                for (const msg of messages) {
+                  const trimmed = msg.trim();
+                  if (!trimmed.startsWith("data:")) continue;
+                  const jsonStr = trimmed.replace(/^data:\s*/, "");
+                  try {
+                    const event = JSON.parse(jsonStr);
+                    if (event.type === "done" || event.type === "error") {
+                      fileFinished = true;
+                    }
+                    handleTranscribeEvent(event);
+                    if (fileFinished) break;
+                  } catch (parseErr) {
+                    if (fileFinished) throw parseErr;
+                    console.warn("Aviso parseando chunk de transcripción:", parseErr);
+                  }
+                }
+
+                if (fileFinished) {
+                  try { await reader.cancel(); } catch (e) {}
+                  break;
+                }
+              }
+            } catch (serverErr) {
+              console.info("Usando motor Whisper IA en el navegador (fallback automático):", serverErr.message);
+              await runBrowserWhisperFallback();
             }
+          } else {
+            // Modo Web Online (GitHub Pages): transcripción 100% en el navegador con Whisper IA
+            await runBrowserWhisperFallback();
           }
 
           // Guardar el texto transcrito de este archivo si se detectó contenido
           if (currentFileText.trim()) {
             accumulatedTranscripts.push(currentFileText.trim());
+          }
+          if (currentFileSegments.length > 0) {
+            lastTranscribedFileSegments.push(currentFileSegments);
           }
 
           // Actualizar barra al terminar este archivo
@@ -1526,7 +1629,9 @@ Gracias al diccionario de pronunciación fonética personalizada, la palabra "ap
   btnClearTranscript.addEventListener("click", () => {
     if (!transcriptionOutput.value.trim()) return;
     if (confirm("¿Deseas vaciar la transcripción actual?")) {
+      lastTranscribedFileSegments = [];
       transcriber.clearTranscription();
+      transcriptionOutput.value = "";
       transcribeWordCount.textContent = "0 palabras";
       showToast("Transcripción vaciada.", "info");
     }
